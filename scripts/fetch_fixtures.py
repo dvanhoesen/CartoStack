@@ -2,27 +2,31 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Prepare the local fixtures used by the Session 01/01b/02 benchmarks.
+"""Prepare and verify the local fixtures shared by the benchmarks and the test suite.
 
-One-time and network-allowed. Copies the Natural Earth shapefiles already in
+Preparing is one-time and network-allowed. Copies the Natural Earth shapefiles already in
 the Cartopy cache and the New York county shapefile from ``resources/``,
 downloads ``ne_10m_populated_places`` (the only file not cached locally),
 copies the SWRCC prepared GeoPackages and logo used by the QPF example
 (``resources/slow_example.py``; source directory overridable with
 ``SWRCC_RESOURCES``), and snapshots every WPC QPF product the example renders.
-Everything goes to the gitignored ``benchmarks/data/`` with a
-``fixtures.json`` record of sources, sizes, and SHA-256 digests.
+Everything goes to the gitignored fixture directory (``benchmarks/data/``, or
+``$CARTOSTACK_FIXTURE_DIR``) with a ``fixtures.json`` record of sources, sizes,
+and SHA-256 digests.
 
-The benchmarks read only ``benchmarks/data/`` and never download. Re-running
-this script is idempotent: existing files are kept when their digest matches,
-and the QPF snapshot is kept once taken (delete ``benchmarks/data/qpf/`` to
-take a new one).
+Benchmarks and tests read only that directory and never download; tests skip
+fixture-dependent cases when it is absent (``tests/conftest.py`` imports
+``fixture_dir`` and ``verify`` from this file). Re-running is idempotent:
+existing files are kept when their digest matches, and the QPF snapshot is kept
+once taken (delete ``<fixture dir>/qpf/`` to take a new one).
 
-    uv run benchmarks/fetch_fixtures.py
+    uv run scripts/fetch_fixtures.py           # prepare (network)
+    uv run scripts/fetch_fixtures.py --check   # verify every file against fixtures.json (offline)
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import io
 import json
@@ -36,7 +40,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA = ROOT / "benchmarks" / "data"
+
+
+def fixture_dir() -> Path:
+    """The shared fixture directory: ``$CARTOSTACK_FIXTURE_DIR`` or ``benchmarks/data``."""
+    return Path(os.environ.get("CARTOSTACK_FIXTURE_DIR", ROOT / "benchmarks" / "data"))
+
+
+DATA = fixture_dir()
 NE_DIR = DATA / "shapefiles" / "natural_earth"  # Cartopy's data_dir layout
 COUNTY_SRC = ROOT / "resources" / "NYS_Shoreline_Counties"
 COUNTY_DST = DATA / "NYS_Shoreline_Counties"
@@ -273,7 +284,29 @@ DOWNLOADS: dict[str, dict[str, object]] = {}
 QPF: dict[str, dict[str, object]] = {}
 
 
+def verify(data_dir: Path | None = None) -> list[str]:
+    """Offline check of every file in ``fixtures.json``; returns a list of problems."""
+    data_dir = data_dir or fixture_dir()
+    manifest_path = data_dir / "fixtures.json"
+    if not manifest_path.exists():
+        return [f"{manifest_path} missing; run: uv run scripts/fetch_fixtures.py"]
+    problems = []
+    for entry in json.loads(manifest_path.read_text())["files"]:
+        path = data_dir / entry["path"]
+        if not path.exists():
+            problems.append(f"missing: {path}")
+        elif sha256(path) != entry["sha256"]:
+            problems.append(f"changed: {path}")
+    return problems
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--check", action="store_true", help="verify only; never download")
+    if parser.parse_args().check:
+        problems = verify()
+        print("\n".join(problems) or f"all fixtures present and unchanged in {DATA}")
+        sys.exit(1 if problems else 0)
     entries: list[dict[str, object]] = []
     copy_cached_natural_earth(entries)
     copy_counties(entries)
@@ -282,7 +315,7 @@ def main() -> None:
     snapshot_qpf(entries)
     manifest = {
         "prepared_utc": datetime.now(UTC).isoformat(timespec="seconds"),
-        "data_dir": str(DATA.relative_to(ROOT)),
+        "data_dir": str(DATA.relative_to(ROOT) if DATA.is_relative_to(ROOT) else DATA),
         "downloads": DOWNLOADS,
         "qpf": QPF,
         "files": entries,

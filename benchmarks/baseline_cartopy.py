@@ -20,7 +20,7 @@ the normal way with Matplotlib and Cartopy and measures it:
 * memory: a separate cold run under ``tracemalloc`` (kept out of the timed
   runs because it slows allocation-heavy code).
 
-Fixtures come only from ``benchmarks/data/`` (``fetch_fixtures.py``); network
+Fixtures come only from ``benchmarks/data/`` (``scripts/fetch_fixtures.py``); network
 access is blocked inside the render processes, so a missing file fails instead
 of downloading. Results go to ``benchmarks/results/<UTC timestamp>/``.
 
@@ -140,7 +140,7 @@ def block_network() -> None:
     """Make any socket connection fail so Cartopy cannot download fixtures."""
 
     def refuse(*args, **kwargs):
-        raise OSError("network access is disabled in the benchmark; run fetch_fixtures.py")
+        raise OSError("network access is disabled in the benchmark; run scripts/fetch_fixtures.py")
 
     socket.socket.connect = refuse  # type: ignore[method-assign]
     socket.create_connection = refuse  # type: ignore[assignment]
@@ -257,13 +257,11 @@ def load_sources():
     return counties, cities
 
 
-def render(sources, variant: int = 0, out: Path | None = None) -> dict:
-    """Draw the full scene once; return per-phase timings and geometry."""
+def build_scene(sources, variant: int = 0) -> dict:
+    """Build the scene's figure and artists without drawing (see ``render``)."""
     import cartopy.crs as ccrs
     import cartopy.feature as cfeature
     import matplotlib.pyplot as plt
-    import numpy as np
-    from PIL import Image
 
     counties, cities = sources
     timer = DrawTimer()
@@ -330,6 +328,19 @@ def render(sources, variant: int = 0, out: Path | None = None) -> dict:
     for artist in (t1, t2, cax):
         timer.wrap(artist, "text_colorbar")
     phases["build_text_colorbar"] = time.perf_counter() - t
+    return {"fig": fig, "ax": ax, "cax": cax, "mesh": mesh, "title": t1, "subtitle": t2,
+            "timer": timer, "phases": phases, "cities": cities}
+
+
+def render(sources, variant: int = 0, out: Path | None = None) -> dict:
+    """Draw the full scene once; return per-phase timings and geometry."""
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from PIL import Image
+
+    scene = build_scene(sources, variant)
+    fig, ax, cax = scene["fig"], scene["ax"], scene["cax"]
+    timer, phases, cities = scene["timer"], scene["phases"], scene["cities"]
 
     t = time.perf_counter()
     fig.canvas.draw()
@@ -521,12 +532,12 @@ def run_child(argv: list[str]) -> tuple[dict, float]:
 def check_fixtures() -> dict:
     manifest_path = DATA / "fixtures.json"
     if not manifest_path.exists():
-        sys.exit("benchmarks/data/fixtures.json missing; run: uv run benchmarks/fetch_fixtures.py")
+        sys.exit("benchmarks/data/fixtures.json missing; run: uv run scripts/fetch_fixtures.py")
     manifest = json.loads(manifest_path.read_text())
     for entry in manifest["files"]:
         path = DATA / entry["path"]
         if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
-            sys.exit(f"fixture missing or changed: {path}; re-run fetch_fixtures.py")
+            sys.exit(f"fixture missing or changed: {path}; re-run scripts/fetch_fixtures.py")
     return manifest
 
 

@@ -1,0 +1,737 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dvanhoesen/GeoScene/schemas/cartostack-manifest-1.schema.json",
+  "title": "CartoStack .cstack manifest, format version 1.x",
+  "description": "Structural rules only. Cross-record rules (geometry fingerprint, member references, georeference/axes consistency, unique ids, colorbar slots, supported projections) are specified in docs/format.md and enforced by cartostack.manifest.parse_manifest.",
+  "type": "object",
+  "required": [
+    "format",
+    "format_version",
+    "geometry",
+    "geometry_fingerprint",
+    "members",
+    "layers"
+  ],
+  "properties": {
+    "format": {
+      "const": "cartostack"
+    },
+    "format_version": {
+      "type": "string",
+      "pattern": "^1\\.(0|[1-9][0-9]*)$"
+    },
+    "geometry": {
+      "$ref": "#/$defs/geometry"
+    },
+    "geometry_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "members": {
+      "type": "object",
+      "propertyNames": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/member"
+          },
+          {
+            "not": {
+              "enum": [
+                "manifest.json",
+                "mimetype"
+              ]
+            }
+          }
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/layer"
+      }
+    },
+    "provenance": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "member": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$",
+      "maxLength": 255
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+    },
+    "rect": {
+      "type": "object",
+      "required": [
+        "left",
+        "top",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "left": {
+          "type": "number"
+        },
+        "top": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "required": [
+        "canvas",
+        "axes"
+      ],
+      "properties": {
+        "canvas": {
+          "type": "object",
+          "required": [
+            "width",
+            "height",
+            "dpi"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100000
+            },
+            "dpi": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "axes": {
+          "$ref": "#/$defs/rect"
+        },
+        "clip": {
+          "enum": [
+            "axes"
+          ]
+        },
+        "figure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "width_in",
+                "height_in",
+                "dpi"
+              ],
+              "properties": {
+                "width_in": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "height_in": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "dpi": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "crop_in": {
+                  "oneOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      },
+                      "minItems": 4,
+                      "maxItems": 4
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "georeference": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/georeference"
+            }
+          ]
+        }
+      }
+    },
+    "georeference": {
+      "type": "object",
+      "required": [
+        "crs",
+        "projection",
+        "projected_extent",
+        "world_to_pixel"
+      ],
+      "properties": {
+        "crs": {
+          "type": "object",
+          "required": [
+            "proj4"
+          ],
+          "properties": {
+            "proj4": {
+              "type": "string"
+            },
+            "wkt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "projection": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "number"
+          },
+          "if": {
+            "properties": {
+              "name": {
+                "const": "lcc"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "a",
+              "f",
+              "lat_0",
+              "lon_0",
+              "lat_1",
+              "lat_2",
+              "x_0",
+              "y_0"
+            ]
+          }
+        },
+        "projected_extent": {
+          "type": "object",
+          "required": [
+            "xmin",
+            "xmax",
+            "ymin",
+            "ymax"
+          ],
+          "properties": {
+            "xmin": {
+              "type": "number"
+            },
+            "xmax": {
+              "type": "number"
+            },
+            "ymin": {
+              "type": "number"
+            },
+            "ymax": {
+              "type": "number"
+            }
+          }
+        },
+        "world_to_pixel": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        }
+      }
+    },
+    "layer": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "order"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "raster",
+            "colorbar",
+            "grid",
+            "polygon",
+            "text"
+          ]
+        },
+        "order": {
+          "type": "number"
+        },
+        "left": {
+          "type": "integer"
+        },
+        "top": {
+          "type": "integer"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "member": {
+          "$ref": "#/$defs/member"
+        },
+        "encoding": {
+          "enum": [
+            "rgba8+zlib",
+            "rgba8",
+            "png"
+          ]
+        }
+      },
+      "dependentRequired": {
+        "member": [
+          "encoding"
+        ],
+        "encoding": [
+          "member"
+        ]
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "raster",
+                  "colorbar"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "member"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "colorbar"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "colorbar"
+            ],
+            "properties": {
+              "colorbar": {
+                "type": "object",
+                "required": [
+                  "slot"
+                ],
+                "properties": {
+                  "slot": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "grid"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "grid"
+            ],
+            "properties": {
+              "grid": {
+                "type": "object",
+                "required": [
+                  "shape",
+                  "index_map",
+                  "norm",
+                  "colormap"
+                ],
+                "properties": {
+                  "shape": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "cells": {
+                    "enum": [
+                      "centers",
+                      "edges"
+                    ]
+                  },
+                  "index_map": {
+                    "type": "object",
+                    "required": [
+                      "member",
+                      "encoding"
+                    ],
+                    "properties": {
+                      "member": {
+                        "$ref": "#/$defs/member"
+                      },
+                      "encoding": {
+                        "enum": [
+                          "i32le+zlib",
+                          "i32le"
+                        ]
+                      }
+                    }
+                  },
+                  "value_dtype": {
+                    "enum": [
+                      "float32",
+                      "float64"
+                    ]
+                  },
+                  "norm": {
+                    "type": "object",
+                    "required": [
+                      "vmin",
+                      "vmax"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "linear"
+                        ]
+                      },
+                      "vmin": {
+                        "type": "number"
+                      },
+                      "vmax": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "colormap": {
+                    "type": "object",
+                    "required": [
+                      "member",
+                      "encoding",
+                      "n_colors"
+                    ],
+                    "properties": {
+                      "member": {
+                        "$ref": "#/$defs/member"
+                      },
+                      "encoding": {
+                        "enum": [
+                          "rgba8+zlib",
+                          "rgba8"
+                        ]
+                      },
+                      "n_colors": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65536
+                      },
+                      "extend": {
+                        "enum": [
+                          "neither",
+                          "min",
+                          "max",
+                          "both"
+                        ]
+                      }
+                    }
+                  },
+                  "alpha": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "polygon"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "polygon"
+            ],
+            "properties": {
+              "polygon": {
+                "type": "object",
+                "required": [
+                  "bins"
+                ],
+                "properties": {
+                  "bins": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "allOf": [
+                        {
+                          "$ref": "#/$defs/bin"
+                        },
+                        {
+                          "required": [
+                            "lower",
+                            "upper"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "interval": {
+                    "enum": [
+                      "closed-open"
+                    ]
+                  },
+                  "round_decimals": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 15
+                      }
+                    ]
+                  },
+                  "fallback": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "$ref": "#/$defs/bin"
+                      }
+                    ]
+                  },
+                  "fill_rule": {
+                    "enum": [
+                      "evenodd"
+                    ]
+                  },
+                  "supersample": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 8
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "type": "object",
+                "required": [
+                  "value",
+                  "font",
+                  "size_px",
+                  "color",
+                  "x",
+                  "y"
+                ],
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "font": {
+                    "$ref": "#/$defs/member"
+                  },
+                  "size_px": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "color": {
+                    "$ref": "#/$defs/color"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "ha": {
+                    "enum": [
+                      "left",
+                      "center",
+                      "right"
+                    ]
+                  },
+                  "va": {
+                    "enum": [
+                      "top",
+                      "center",
+                      "baseline",
+                      "bottom"
+                    ]
+                  },
+                  "layout": {
+                    "enum": [
+                      "matplotlib"
+                    ]
+                  },
+                  "snap": {
+                    "enum": [
+                      null,
+                      "round"
+                    ]
+                  },
+                  "offset": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  },
+                  "rotation": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "bin": {
+      "type": "object",
+      "required": [
+        "color",
+        "order"
+      ],
+      "properties": {
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "color": {
+          "$ref": "#/$defs/color"
+        },
+        "order": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

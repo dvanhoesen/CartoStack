@@ -1,0 +1,160 @@
+{
+  "format": "cartostack",
+  "format_version": "1.0",
+  "geometry": {
+    "canvas": {
+      "width": 1200,
+      "height": 800,
+      "dpi": 100.0
+    },
+    "clip": "axes",
+    "figure": {
+      "width_in": 12.0,
+      "height_in": 8.0,
+      "dpi": 100.0,
+      "crop_in": null
+    },
+    "georeference": {
+      "crs": {
+        "proj4": "+ellps=WGS84 +proj=lcc +lon_0=-76.0 +lat_0=42.5 +x_0=0.0 +y_0=0.0 +lat_1=40.5 +lat_2=44.5 +no_defs",
+        "wkt": null
+      },
+      "projection": {
+        "name": "lcc",
+        "a": 6378137.0,
+        "f": 0.0033528106647474805,
+        "lat_0": 42.5,
+        "lon_0": -76.0,
+        "lat_1": 40.5,
+        "lat_2": 44.5,
+        "x_0": 0.0,
+        "y_0": 0.0
+      },
+      "projected_extent": {
+        "xmin": -383043.175765973,
+        "xmax": 383043.175765973,
+        "ymin": -245186.46086215833,
+        "ymax": 320412.66631611565
+      },
+      "world_to_pixel": [
+        0.001103254884980256,
+        0.0,
+        599.9999999999999,
+        0.0,
+        -0.0011032548849802567,
+        425.4968393228034
+      ]
+    },
+    "axes": {
+      "left": 177.40574517783932,
+      "top": 71.99999999999983,
+      "width": 845.1885096443211,
+      "height": 624.0000000000002
+    }
+  },
+  "geometry_fingerprint": "sha256:4e44c3eab968ce3e93421f9331183821ed220647cf54819e90423512d4fe3247",
+  "members": {
+    "layers/below.rgba8.zz": {
+      "bytes": 34360,
+      "sha256": "6ad78987d0a653c812ca70e5c9da4349ce9669c58cf2f90094872a5f976f523a"
+    },
+    "layers/above.rgba8.zz": {
+      "bytes": 129540,
+      "sha256": "d6e85d8c6b2c5780d44bcedd2da8ef5f0da195fe27a74700a91c0e3812f060ad"
+    },
+    "slots/temperature/index.i32.zz": {
+      "bytes": 351607,
+      "sha256": "d68f1572281d254602dae883fde7c53f98ad32a05ff881f8144b30e536e26c72"
+    },
+    "slots/temperature/lut.rgba8": {
+      "bytes": 1036,
+      "sha256": "1f6e4b3a12c049252a814bd5f784fc93421ba32ca78e20db817ae15a6d8dabfe"
+    },
+    "fonts/DejaVuSans.ttf": {
+      "bytes": 756072,
+      "sha256": "3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22"
+    }
+  },
+  "layers": [
+    {
+      "id": "below",
+      "kind": "raster",
+      "order": 0,
+      "member": "layers/below.rgba8.zz",
+      "encoding": "rgba8+zlib"
+    },
+    {
+      "id": "temperature",
+      "kind": "grid",
+      "order": 10,
+      "grid": {
+        "shape": [
+          500,
+          500
+        ],
+        "cells": "centers",
+        "index_map": {
+          "member": "slots/temperature/index.i32.zz",
+          "encoding": "i32le+zlib"
+        },
+        "value_dtype": "float32",
+        "norm": {
+          "kind": "linear",
+          "vmin": -10.0,
+          "vmax": 35.0
+        },
+        "colormap": {
+          "member": "slots/temperature/lut.rgba8",
+          "encoding": "rgba8",
+          "n_colors": 256,
+          "extend": "both"
+        },
+        "alpha": 0.8
+      }
+    },
+    {
+      "id": "above",
+      "kind": "raster",
+      "order": 20,
+      "member": "layers/above.rgba8.zz",
+      "encoding": "rgba8+zlib"
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "order": 30,
+      "text": {
+        "value": "Valid 2026-10-08 12:00 UTC  \u00b7  CartoStack baseline variant 0",
+        "font": "fonts/DejaVuSans.ttf",
+        "size_px": 16.666666666666668,
+        "color": [
+          68,
+          68,
+          68,
+          255
+        ],
+        "x": 600.0,
+        "y": 54.39999999999998,
+        "ha": "center",
+        "va": "top",
+        "layout": "matplotlib",
+        "snap": "round",
+        "offset": [
+          0.0,
+          -1.0
+        ],
+        "rotation": 0.0
+      }
+    }
+  ],
+  "provenance": {
+    "cartostack": "0.0.1.dev0",
+    "created_utc": "2026-10-08T15:51:39Z",
+    "authoring": {
+      "matplotlib": "3.11.2",
+      "cartopy": "0.26.0",
+      "python": "3.13"
+    },
+    "source": "benchmarks/prototype_build.py (Session 02), scene benchmarks/baseline_cartopy.py"
+  }
+}

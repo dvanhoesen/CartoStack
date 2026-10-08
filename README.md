@@ -550,7 +550,9 @@ A later version could move to an indexed binary container if profiling shows ZIP
 
 # Scene metadata
 
-Example `manifest.json` (field names are provisional until the format specification session):
+> **Superseded:** the format is now specified in [`docs/format.md`](docs/format.md) (version 1.0, Session 04), with real examples in `docs/examples/`. The sketch below is the original proposal and its field names differ.
+
+Example `manifest.json` (original proposal):
 
 ```json
 {

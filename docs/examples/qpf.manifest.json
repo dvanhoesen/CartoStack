@@ -1,0 +1,343 @@
+{
+  "format": "cartostack",
+  "format_version": "1.0",
+  "geometry": {
+    "canvas": {
+      "width": 2210,
+      "height": 1848,
+      "dpi": 300.0
+    },
+    "clip": "axes",
+    "figure": {
+      "width_in": 10.0,
+      "height_in": 8.0,
+      "dpi": 100.0,
+      "crop_in": [
+        1.440166337705889,
+        0.8799999999999994,
+        7.369667324588221,
+        6.16
+      ]
+    },
+    "georeference": {
+      "crs": {
+        "proj4": "+ellps=WGS84 +proj=lcc +lon_0=-75.84999999999999 +lat_0=42.95 +x_0=0.0 +y_0=0.0 +lat_1=33 +lat_2=45 +no_defs",
+        "wkt": null
+      },
+      "projection": {
+        "name": "lcc",
+        "a": 6378137.0,
+        "f": 0.0033528106647474805,
+        "lat_0": 42.95,
+        "lon_0": -75.85,
+        "lat_1": 33.0,
+        "lat_2": 45.0,
+        "x_0": 0.0,
+        "y_0": 0.0
+      },
+      "projected_extent": {
+        "xmin": -350859.05046668247,
+        "xmax": 350859.05046668247,
+        "ymin": -285022.088921969,
+        "ymax": 301515.03838194924
+      },
+      "world_to_pixel": [
+        0.0031506956916683747,
+        0.0,
+        1105.4500986882333,
+        0.0,
+        -0.0031506956916683747,
+        949.9821324032318
+      ]
+    },
+    "axes": {
+      "left": 0.0,
+      "top": -2.2737367544323206e-13,
+      "width": 2210.9001973764666,
+      "height": 1848.0000000000002
+    }
+  },
+  "geometry_fingerprint": "sha256:7b45535004e802e9de7e27767c9264a3abf0a8d3355a0476157ae3ea3f230bd7",
+  "members": {
+    "layers/below.rgba8.zz": {
+      "bytes": 20401,
+      "sha256": "d579a6599c679e4b78f7877b4210c36403697acbc969d921e3466c8aae369175"
+    },
+    "layers/above.rgba8.zz": {
+      "bytes": 414149,
+      "sha256": "a1aa2b29106f4836a03ebdb33076f47cb94dcf9f746076e971d85ea3c5911e58"
+    },
+    "fonts/DejaVuSans-Oblique.ttf": {
+      "bytes": 633840,
+      "sha256": "ccdf74b350f11fd3dd5774de50e5e6346a1a5da1f5b7d5fb83590665e97a5213"
+    }
+  },
+  "layers": [
+    {
+      "id": "below",
+      "kind": "raster",
+      "order": 0,
+      "member": "layers/below.rgba8.zz",
+      "encoding": "rgba8+zlib"
+    },
+    {
+      "id": "qpf",
+      "kind": "polygon",
+      "order": 10,
+      "polygon": {
+        "bins": [
+          {
+            "lower": 0.0,
+            "upper": 0.01,
+            "color": [
+              255,
+              255,
+              255,
+              255
+            ],
+            "order": 10
+          },
+          {
+            "lower": 0.01,
+            "upper": 0.1,
+            "color": [
+              127,
+              255,
+              0,
+              255
+            ],
+            "order": 11
+          },
+          {
+            "lower": 0.1,
+            "upper": 0.25,
+            "color": [
+              0,
+              205,
+              0,
+              255
+            ],
+            "order": 12
+          },
+          {
+            "lower": 0.25,
+            "upper": 0.5,
+            "color": [
+              0,
+              139,
+              0,
+              255
+            ],
+            "order": 13
+          },
+          {
+            "lower": 0.5,
+            "upper": 0.75,
+            "color": [
+              16,
+              78,
+              139,
+              255
+            ],
+            "order": 14
+          },
+          {
+            "lower": 0.75,
+            "upper": 1.0,
+            "color": [
+              30,
+              144,
+              255,
+              255
+            ],
+            "order": 15
+          },
+          {
+            "lower": 1.0,
+            "upper": 1.25,
+            "color": [
+              0,
+              178,
+              238,
+              255
+            ],
+            "order": 16
+          },
+          {
+            "lower": 1.25,
+            "upper": 1.5,
+            "color": [
+              0,
+              238,
+              238,
+              255
+            ],
+            "order": 17
+          },
+          {
+            "lower": 1.5,
+            "upper": 1.75,
+            "color": [
+              137,
+              104,
+              205,
+              255
+            ],
+            "order": 18
+          },
+          {
+            "lower": 1.75,
+            "upper": 2.0,
+            "color": [
+              145,
+              44,
+              238,
+              255
+            ],
+            "order": 19
+          },
+          {
+            "lower": 2.0,
+            "upper": 2.5,
+            "color": [
+              139,
+              0,
+              139,
+              255
+            ],
+            "order": 20
+          },
+          {
+            "lower": 2.5,
+            "upper": 3.0,
+            "color": [
+              139,
+              0,
+              0,
+              255
+            ],
+            "order": 21
+          },
+          {
+            "lower": 3.0,
+            "upper": 4.0,
+            "color": [
+              205,
+              0,
+              0,
+              255
+            ],
+            "order": 22
+          },
+          {
+            "lower": 4.0,
+            "upper": 5.0,
+            "color": [
+              238,
+              64,
+              0,
+              255
+            ],
+            "order": 23
+          },
+          {
+            "lower": 5.0,
+            "upper": 7.0,
+            "color": [
+              255,
+              127,
+              0,
+              255
+            ],
+            "order": 24
+          },
+          {
+            "lower": 7.0,
+            "upper": 10.0,
+            "color": [
+              205,
+              133,
+              0,
+              255
+            ],
+            "order": 25
+          },
+          {
+            "lower": 10.0,
+            "upper": 15.0,
+            "color": [
+              255,
+              215,
+              0,
+              255
+            ],
+            "order": 26
+          }
+        ],
+        "interval": "closed-open",
+        "round_decimals": 2,
+        "fallback": {
+          "color": [
+            128,
+            128,
+            128,
+            255
+          ],
+          "order": 10
+        },
+        "fill_rule": "evenodd",
+        "supersample": 2
+      }
+    },
+    {
+      "id": "above",
+      "kind": "raster",
+      "order": 20,
+      "member": "layers/above.rgba8.zz",
+      "encoding": "rgba8+zlib"
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "order": 30,
+      "text": {
+        "value": "8:00 AM Oct 8 - 8:00 AM Oct 11 (Issued: 6:19 AM Oct 8)",
+        "font": "fonts/DejaVuSans-Oblique.ttf",
+        "size_px": 45.833333333333336,
+        "color": [
+          0,
+          0,
+          0,
+          255
+        ],
+        "x": 1105.4500986882333,
+        "y": 157.0799999999997,
+        "ha": "center",
+        "va": "bottom",
+        "layout": "matplotlib",
+        "snap": "round",
+        "offset": [
+          0.0,
+          -1.0
+        ],
+        "rotation": 0.0
+      }
+    }
+  ],
+  "provenance": {
+    "cartostack": "0.0.1.dev0",
+    "created_utc": "2026-10-08T15:51:39Z",
+    "authoring": {
+      "matplotlib": "3.11.2",
+      "cartopy": "0.26.0",
+      "python": "3.13"
+    },
+    "source": "benchmarks/prototype_build.py (Session 02), scene resources/slow_example.py",
+    "sources": [
+      {
+        "name": "qpf/day_1-3/day13_2026100812.shp (authoring product; data hidden)",
+        "sha256": "c43cf9c62e0ee3f85c465f6cac135ce45720a7b76fbd9526d3aed576ad1e9a1b"
+      }
+    ]
+  }
+}

@@ -8,10 +8,10 @@ This is the implementation checklist and handoff record for building CartoStack 
 
 - Last updated: 2026-10-08.
 - Active session: none.
-- Last completed session: **01b — QPF workload baseline** (2026-10-08).
-- Next implementation session: **02 — file-based prototype benchmark and feasibility results**.
-- Repository implementation state: no Python package yet. Configured standalone benchmarks: `benchmarks/fetch_fixtures.py`, `benchmarks/baseline_cartopy.py` (synthetic grid) and `benchmarks/baseline_qpf.py` (QPF), each PEP 723 with a `.lock` file. Reference results (gitignored): `benchmarks/results/20261008T145213Z/` (grid) and `benchmarks/results/qpf-20261008T152044Z/` (QPF).
-- Before starting Session 02: import both reference scenes — QPF from `benchmarks/baseline_qpf.py` (`load_static()`, `read_product(day)`, `render_product()`; geometry in the Session 01b log) and the synthetic grid from `benchmarks/baseline_cartopy.py`. Compare against the pinned-environment baselines, not production images (Matplotlib 3.11 text layout differs from production; see the 01b log). Still undecided: whether `resources/` is committed — ask before any commit.
+- Last completed session: **04 — `.cstack` format specification v1** (2026-10-08).
+- Next implementation session: **05 — Core reader/writer and layer model**.
+- Repository implementation state: installable `cartostack` package skeleton (`pyproject.toml`, `uv.lock`, `src/cartostack/` with `errors.py`, `geometry.py`, `manifest.py` (format 1.0 validation, plain Python) and `schemas/manifest-1.schema.json`, `docs/format.md` and `docs/examples/`, `tests/`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`); no reader/writer or rendering modules yet. Shared fixture script `scripts/fetch_fixtures.py`. Configured standalone benchmarks (PEP 723, each with a `.lock` file): `baseline_cartopy.py` (synthetic grid), `baseline_qpf.py` (QPF), and the Session 02 prototype `prototype_build.py`, `prototype_runtime.py` (NumPy + Pillow only), `prototype_compare.py`. Reference results (gitignored): `benchmarks/results/20261008T145213Z/` (grid), `qpf-20261008T152044Z/` (QPF), `prototype-20261008T155139Z/` (prototype files, runtime and comparison).
+- Before starting Session 05: build the reader/writer on `cartostack.manifest.parse_manifest` and the encodings in `docs/format.md` §2 and §6.3 (`mimetype` first, ZIP_STORED, member size and SHA-256 checks, atomic writes, preserving unknown fields). CI has still not run on GitHub; it runs on the first push (needs the user's approval). Still undecided: whether `resources/` is committed.
 
 ## How to execute and update a session
 
@@ -36,9 +36,9 @@ Reusable request:
 | [00](#session-00) | Session tracker and handoff workflow | None | completed |
 | [01](#session-01) | Standalone benchmark baseline | 00 | completed |
 | [01b](#session-01b) | QPF workload baseline | 01 | completed |
-| [02](#session-02) | File-based prototype benchmark and feasibility results | 01b | planned |
-| [03](#session-03) | Python package, tooling, and initial CI | 02 | planned |
-| [04](#session-04) | `.cstack` format specification v1 | 03 | planned |
+| [02](#session-02) | File-based prototype benchmark and feasibility results | 01b | completed |
+| [03](#session-03) | Python package, tooling, and initial CI | 02 | completed |
+| [04](#session-04) | `.cstack` format specification v1 | 03 | completed |
 | [05](#session-05) | Core reader/writer and layer model | 04 | planned |
 | [06](#session-06) | Compositor, cropped placement, and PNG output | 05 | planned |
 | [07](#session-07) | Layer editing API | 06 | planned |
@@ -123,7 +123,7 @@ Proposed concrete values for the benchmark. Session 01 may change them, but must
 | Data | Deterministic synthetic 500 × 500 regular lon/lat grid (cell centres) over `[-81, -71] × [40, 46]` (covers the extent so most cells are visible), analytic `float32` field (`make_field(variant)`), `cmap="coolwarm"`, `vmin=-10`, `vmax=35`, `pcolormesh(..., shading="nearest", alpha=0.8)` so compositing over the static layers below is exercised |
 | Above data | New York counties (`resources/NYS_Shoreline_Counties/NYS Counties.shp`, see [Environment](#environment-observed-2026-10-07)), states, country borders, coastline, city markers and labels (`ne_10m_populated_places`, filtered to the extent and `SCALERANK <= 7`: 34 cities) |
 | Text/decorations | title (18 pt), subtitle/valid time (12 pt), horizontal colorbar (`extend="both"`, label `°C`); DejaVu Sans regular |
-| Fixtures | `benchmarks/fetch_fixtures.py` copies cached Natural Earth files and the county shapefile from `resources/`, downloads only `ne_10m_populated_places`, and writes them to gitignored `benchmarks/data/`, recording sources and SHA-256 (verifying the county hashes recorded under Environment); the benchmark reads only those local paths and fails rather than downloading |
+| Fixtures | `scripts/fetch_fixtures.py` copies cached Natural Earth files and the county shapefile from `resources/`, downloads only `ne_10m_populated_places`, and writes them to gitignored `benchmarks/data/`, recording sources and SHA-256 (verifying the county hashes recorded under Environment); the benchmark reads only those local paths and fails rather than downloading |
 | Timing | Two modes, both recorded. **Cold process (primary):** ≥5 fresh `subprocess` runs measuring interpreter start, imports (`numpy`, `PIL`, `matplotlib`, `cartopy` separately), and end-to-end wall time, because each cron product pays these costs. **Warm in-process:** 1 warm-up plus ≥10 timed repetitions; median and min; `time.perf_counter` per phase. Cartopy keeps in-process geometry caches (Natural Earth geometries and projected paths), so warm repetitions understate a cron job's cost. Memory: `tracemalloc` and peak RSS |
 | PNG encoding | Encode baseline and file-based outputs with identical Pillow settings (record `compress_level`, mode RGB vs RGBA); also time `compress_level=1`, since encoding is likely to become the dominant recurring cost |
 | Outputs | gitignored `benchmarks/results/<UTC timestamp>/` (PNG plus `results.json`); summarize the numbers in the completion log |
@@ -150,9 +150,9 @@ Validate these defaults while implementing the relevant session, and record any 
 
 - One `cartostack` distribution using `src/cartostack/`. Core dependencies are NumPy and Pillow only; core covers loading, editing, grid and text slots, compositing, saving, and PNG output. A `build` extra adds Matplotlib and Cartopy for authoring (`cartostack.build`). A later `geo` extra may add pyproj for runtime coordinate overlays. Importing `cartostack` must never import an extra.
 - Use `uv`, Hatchling, pytest, Ruff, and mypy. Python 3.12+ is the candidate minimum: current NumPy requires 3.12, and SPEC 0 (followed by NumPy/Matplotlib/Cartopy) has already dropped 3.11. Confirm against actual dependency support before declaring it.
-- The `.cstack` container is a ZIP with a JSON manifest, borrowing from OpenRaster (`.ora`: ZIP of PNG layers plus a stack description) and GeoTIFF conventions (CRS plus an affine pixel transform). Members are stored uncompressed in the ZIP (`ZIP_STORED`) so the layer encoding alone determines decode cost. Layer encoding (PNG vs raw/zstd arrays) is chosen from Session 02 measurements; the format records the encoding per layer so both can coexist.
+- The `.cstack` container is a ZIP with a JSON manifest, borrowing from OpenRaster (`.ora`: ZIP of PNG layers plus a stack description) and GeoTIFF conventions (CRS plus an affine pixel transform). Members are stored uncompressed in the ZIP (`ZIP_STORED`) so the layer encoding alone determines decode cost. Decided in Session 02: default layer encoding is zlib-compressed raw RGBA (stdlib, smallest file, ~4–5 ms per 4 MP layer decode); PNG remains supported as a viewable encoding, raw for debugging. The format records the encoding per layer. zstd is reconsidered when the minimum Python is 3.14 (stdlib `compression.zstd`).
 - The format is versioned and specified in `docs/format.md` before code depends on it. Readers reject unknown major versions and ignore unknown optional fields within a major version. No pickle, live figures, or serialized callbacks.
-- Raster layers use `(height, width, 4)` `uint8` RGBA with a top-left origin and straight (non-premultiplied) alpha, matching Matplotlib Agg's `buffer_rgba()`, PNG, and Pillow's `Image.alpha_composite`. Expect ±1–2 level rounding differences versus a single-canvas Agg render; quantify them rather than assuming bit equality.
+- Raster layers use `(height, width, 4)` `uint8` RGBA with a top-left origin and straight (non-premultiplied) alpha, matching Matplotlib Agg's `buffer_rgba()`, PNG, and Pillow's `Image.alpha_composite`. Measured in Session 02: Pillow stacking of Agg-rendered layers stays within 3–5 levels of the single-canvas render (17–45 % of pixels differ by 1–3). Matplotlib's own integer blend (`fixed_blender_rgba_plain`) for partly transparent pixels makes it exact on all but 1.4 %, but costs ~290 ms per 4 MP frame in NumPy; it is an option, not the default.
 - Every layer shares the file's canvas geometry: pixel size, DPI, axes rectangle, projection, extent, and clipping. Pixel `(x, y)` means the same location in every layer. Layers may be cropped and placed at an integer offset. Geometry is immutable; operations that would change it fail explicitly.
 - Grid slots store a pixel→cell `int32` index map (−1 = no data) plus normalization and a colormap lookup table, so new values render with a NumPy gather and lookup. Produce index maps at build time with the index-image method (Session 10). This is georeferencing data in the file, not a cache.
 - Polygon slots store a bin table (value ranges → colours and draw order) and use the file's georeferencing. The runtime projects lon/lat rings with NumPy (Lambert Conformal Conic forward formula, verified against pyproj in build-extra tests), maps them to pixels with the stored affine transform, fills them in draw order (holes included) into a `uint8` bin-index image, clips to the map area, and colours it through the bin LUT. Pillow polygon fill is not anti-aliased; supersampling (2–4×) then downsampling is the dependency-free way to approach Agg's edges — measure the difference and cost in Session 02.
@@ -182,10 +182,10 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Goal:** Produce a reproducible conventional Cartopy baseline without scaffolding the library.
 
-**Deliverables:** `benchmarks/fetch_fixtures.py`, `benchmarks/baseline_cartopy.py`, `.gitignore` entries for `benchmarks/data/` and `benchmarks/results/`, and baseline artifacts.
+**Deliverables:** `scripts/fetch_fixtures.py`, `benchmarks/baseline_cartopy.py`, `.gitignore` entries for `benchmarks/data/` and `benchmarks/results/`, and baseline artifacts.
 
 - [x] Record the chosen workload, projection, extent, dimensions, DPI, grid shape, font, and dependency versions (start from the [workload specification](#session-01-workload-specification)); record `uv --version`.
-- [x] Prepare fixtures with `benchmarks/fetch_fixtures.py` (one-time, network allowed), recording URLs, file sizes, and SHA-256.
+- [x] Prepare fixtures with `scripts/fetch_fixtures.py` (one-time, network allowed), recording URLs, file sizes, and SHA-256.
 - [x] Create a standalone benchmark using pinned PEP 723 inline script metadata, run with `uv run benchmarks/baseline_cartopy.py`.
 - [x] Draw representative land/water, boundaries, labels, data, title/subtitle, and colorbar in their correct drawing order.
 - [x] Keep source acquisition outside measured operations; document how prepared fixtures are reused without network access.
@@ -199,7 +199,7 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Goal:** A reproducible Cartopy baseline for the real QPF workload, excluding data acquisition.
 
-**Deliverables:** QPF and SWRCC fixtures added to `benchmarks/fetch_fixtures.py`, `benchmarks/baseline_qpf.py` (PEP 723, pinned, locked), and baseline artifacts.
+**Deliverables:** QPF and SWRCC fixtures added to `scripts/fetch_fixtures.py`, `benchmarks/baseline_qpf.py` (PEP 723, pinned, locked), and baseline artifacts.
 
 - [x] Extend `fetch_fixtures.py`: copy the prepared GeoPackages and logo with SHA-256, and snapshot several WPC QPF products once (record URLs, issue times, sizes, SHA-256).
 - [x] Port the example's drawing code faithfully into `benchmarks/baseline_qpf.py`, reading only fixtures; record deviations (e.g. pyshp/shapely instead of GeoPandas if chosen, with its effect on read time).
@@ -215,15 +215,15 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `benchmarks/prototype_build.py` (writes a prototype layered file from the Session 01 scene), `benchmarks/prototype_runtime.py` (core-only runtime), reference/runtime/difference images, and machine-readable measurements.
 
-- [ ] Build step: render each static group (below data, above data) and the title into transparent RGBA images from figures with identical size, DPI, and resolved axes position; never use `bbox_inches="tight"`.
-- [ ] Build step: produce the data grid's pixel→cell index map with the index-image method (draw `pcolormesh(antialiased=False, linewidth=0)` with per-cell face colors encoding the flat cell index; decode to `int32`, −1 where empty). Store it with the colormap LUT and `vmin`/`vmax`.
-- [ ] QPF: store the static-below and flattened static-above layers, the bin table, and the projection parameters; at runtime project polygon rings with a NumPy LCC implementation (check against pyproj at build time), fill them in QPF order into a bin-index image (with and without supersampling), and render the subtitle. Measure the per-product loop with the file loaded once.
-- [ ] Write a prototype ZIP (JSON manifest plus layer members) in two layer encodings: PNG, and raw arrays compressed with zstd (or `.npy` if zstd is unavailable). Record file sizes.
-- [ ] Runtime step, importing only NumPy and Pillow (assert via `sys.modules`): load the file, render new grid values via gather → normalize → LUT → apply alpha, render new QPF polygons, render a new title with Pillow and the same TTF, composite in order, encode PNG.
-- [ ] Compare the runtime output with a full Cartopy render of the same updated inputs; record pixel differences separately for the data, static, and text regions and inspect them. Text is expected to differ slightly (Pillow vs Matplotlib).
-- [ ] Measure cold-process time for the runtime split into interpreter start, imports, manifest read, per-layer decode (each encoding), grid render, text render, compositing, and PNG encoding (`compress_level` 6 and 1), plus peak memory.
-- [ ] Report speedup versus the Session 01 cold and warm baselines, and the authoring time and break-even reuse count.
-- [ ] Record decisions: default layer encoding, whether contiguous static runs should be stored pre-flattened, and any feasibility blocker to resolve before library scaffolding.
+- [x] Build step: render each static group (below data, above data) and the title into transparent RGBA images from figures with identical size, DPI, and resolved axes position; never use `bbox_inches="tight"`.
+- [x] Build step: produce the data grid's pixel→cell index map with the index-image method (draw `pcolormesh(antialiased=False, linewidth=0)` with per-cell face colors encoding the flat cell index; decode to `int32`, −1 where empty). Store it with the colormap LUT and `vmin`/`vmax`.
+- [x] QPF: store the static-below and flattened static-above layers, the bin table, and the projection parameters; at runtime project polygon rings with a NumPy LCC implementation (check against pyproj at build time), fill them in QPF order into a bin-index image (with and without supersampling), and render the subtitle. Measure the per-product loop with the file loaded once.
+- [x] Write a prototype ZIP (JSON manifest plus layer members) in two layer encodings: PNG, and raw arrays compressed with zstd (or `.npy` if zstd is unavailable). Record file sizes.
+- [x] Runtime step, importing only NumPy and Pillow (assert via `sys.modules`): load the file, render new grid values via gather → normalize → LUT → apply alpha, render new QPF polygons, render a new title with Pillow and the same TTF, composite in order, encode PNG.
+- [x] Compare the runtime output with a full Cartopy render of the same updated inputs; record pixel differences separately for the data, static, and text regions and inspect them. Text is expected to differ slightly (Pillow vs Matplotlib).
+- [x] Measure cold-process time for the runtime split into interpreter start, imports, manifest read, per-layer decode (each encoding), grid render, text render, compositing, and PNG encoding (`compress_level` 6 and 1), plus peak memory.
+- [x] Report speedup versus the Session 01 cold and warm baselines, and the authoring time and break-even reuse count.
+- [x] Record decisions: default layer encoding, whether contiguous static runs should be stored pre-flattened, and any feasibility blocker to resolve before library scaffolding.
 
 **Verification:** Repeat runtime updates with several different data/title inputs, each compared against its own full render. Store visual evidence and measurements outside source files, with paths and results recorded in the log.
 
@@ -233,12 +233,12 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `pyproject.toml`, `uv.lock`, `src/cartostack/`, `tests/`, contributor setup instructions, and initial CI.
 
-- [ ] Re-verify that `cartostack` is still available on PyPI (and unclaimed on conda-forge) before creating `src/cartostack/`; if taken, stop and ask for a new name.
-- [ ] Configure the Python range, Hatchling, NumPy/Pillow core dependencies, the `build` extra (Matplotlib, Cartopy), and the development dependency group.
-- [ ] Configure Ruff, mypy, and pytest, creating modules only as they are needed.
-- [ ] Add GitHub Actions CI with a core-only job (no extras installed) and a `build`-extra job from the start, plus a test asserting `import cartostack` imports neither Matplotlib nor Cartopy.
-- [ ] Move reusable fixture preparation from `benchmarks/` into a documented script the test suite can share; keep network access out of test runs.
-- [ ] Document exact setup/check commands and update stale repository-state guidance in `CLAUDE.md`.
+- [x] Re-verify that `cartostack` is still available on PyPI (and unclaimed on conda-forge) before creating `src/cartostack/`; if taken, stop and ask for a new name.
+- [x] Configure the Python range, Hatchling, NumPy/Pillow core dependencies, the `build` extra (Matplotlib, Cartopy), and the development dependency group.
+- [x] Configure Ruff, mypy, and pytest, creating modules only as they are needed.
+- [x] Add GitHub Actions CI with a core-only job (no extras installed) and a `build`-extra job from the start, plus a test asserting `import cartostack` imports neither Matplotlib nor Cartopy.
+- [x] Move reusable fixture preparation from `benchmarks/` into a documented script the test suite can share; keep network access out of test runs.
+- [x] Document exact setup/check commands and update stale repository-state guidance in `CLAUDE.md`.
 
 **Verification:** Fresh-environment installation, import smoke test, configured format/lint/type/test checks, and distribution build. Record which environments have which extras installed.
 
@@ -248,16 +248,16 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `docs/format.md`, a machine-checkable manifest schema, `cartostack/geometry.py`, and example manifests.
 
-- [ ] Container: ZIP layout, member naming, `ZIP_STORED` members, manifest location, and format version with major/minor compatibility rules.
-- [ ] Canvas geometry: pixel width/height, DPI, axes rectangle in pixels (top-left origin), clipping, and a deterministic geometry fingerprint.
-- [ ] Georeferencing: CRS as a PROJ/WKT string plus the projection parameters as plain data sufficient for the runtime's NumPy forward projection (LCC in v1; unknown projections make polygon slots unusable with a clear error), projected extent, and a GeoTIFF-style affine transform from projected coordinates to canvas pixels.
-- [ ] Layer records: id, kind (`raster`, `grid`, `text`, `colorbar`), order and tie-breaking, placement offset and size, visibility, opacity, encoding, member path, and checksum.
-- [ ] Grid slot records: grid shape, index-map member, cell-center/edge convention, normalization (`vmin`/`vmax`, clipping/extend), colormap LUT member, masked/NaN color, and layer alpha.
-- [ ] Polygon slot records: bin table (ranges, colours, draw order, inclusive/exclusive edges), out-of-range colour, fill rule and hole handling, anti-aliasing/supersampling factor, clipping region.
-- [ ] Output crop: record a fixed output crop (e.g. a resolved `bbox_inches="tight"` box) separately from the canvas so pixel `(x, y)` stays consistent.
-- [ ] Text slot records: current text, embedded font member, size, color, anchor/alignment, position, rotation (if supported), and the rendered-pixel member.
-- [ ] Provenance metadata (CartoStack version, authoring library versions, source checksums) as optional, non-required fields.
-- [ ] Implement immutable geometry and manifest validation in plain Python; test invalid dimensions, inconsistent records, unknown versions, and fingerprints without importing extras.
+- [x] Container: ZIP layout, member naming, `ZIP_STORED` members, manifest location, and format version with major/minor compatibility rules.
+- [x] Canvas geometry: pixel width/height, DPI, axes rectangle in pixels (top-left origin), clipping, and a deterministic geometry fingerprint.
+- [x] Georeferencing: CRS as a PROJ/WKT string plus the projection parameters as plain data sufficient for the runtime's NumPy forward projection (LCC in v1; unknown projections make polygon slots unusable with a clear error), projected extent, and a GeoTIFF-style affine transform from projected coordinates to canvas pixels.
+- [x] Layer records: id, kind (`raster`, `grid`, `text`, `colorbar`), order and tie-breaking, placement offset and size, visibility, opacity, encoding, member path, and checksum.
+- [x] Grid slot records: grid shape, index-map member, cell-center/edge convention, normalization (`vmin`/`vmax`, clipping/extend), colormap LUT member, masked/NaN color, and layer alpha.
+- [x] Polygon slot records: bin table (ranges, colours, draw order, inclusive/exclusive edges), out-of-range colour, fill rule and hole handling, anti-aliasing/supersampling factor, clipping region.
+- [x] Output crop: record a fixed output crop (e.g. a resolved `bbox_inches="tight"` box) separately from the canvas so pixel `(x, y)` stays consistent.
+- [x] Text slot records: current text, embedded font member, size, color, anchor/alignment, position, rotation (if supported), and the rendered-pixel member.
+- [x] Provenance metadata (CartoStack version, authoring library versions, source checksums) as optional, non-required fields.
+- [x] Implement immutable geometry and manifest validation in plain Python; test invalid dimensions, inconsistent records, unknown versions, and fingerprints without importing extras.
 
 **Verification:** Schema validation of example manifests, geometry/validation unit tests, and a review of `docs/format.md` against the Session 02 prototype's needs.
 
@@ -466,7 +466,7 @@ This section is the version-controlled source of truth for commands; mark each a
 Configured (Session 01, verified 2026-10-08):
 
 ```bash
-uv run benchmarks/fetch_fixtures.py       # one-time, network; idempotent; writes benchmarks/data/ + fixtures.json
+uv run scripts/fetch_fixtures.py       # one-time, network; idempotent; writes benchmarks/data/ + fixtures.json
 uv run benchmarks/baseline_cartopy.py     # offline Cartopy baseline (7 cold runs, tracemalloc run, 1+10 warm); ~3.5 min
 uv run benchmarks/baseline_cartopy.py --cold-runs 3 --warm-reps 3              # shorter run
 uv run benchmarks/baseline_cartopy.py --child render --variant N --out x.png   # one full render of input variant N
@@ -476,31 +476,45 @@ uv lock --script benchmarks/baseline_cartopy.py   # refresh benchmarks/baseline_
 Configured (Session 01b, verified 2026-10-08):
 
 ```bash
-uv run benchmarks/fetch_fixtures.py       # also copies SWRCC GeoPackages/logo (SWRCC_RESOURCES overrides the source) and snapshots 18 WPC QPF products once
+uv run scripts/fetch_fixtures.py       # also copies SWRCC GeoPackages/logo (SWRCC_RESOURCES overrides the source) and snapshots 18 WPC QPF products once
 uv run benchmarks/baseline_qpf.py         # 5 cold single-product runs + 2 cold 18-product loops; ~4 min
 uv run benchmarks/baseline_qpf.py --day 1-7 --cold-runs 3 --loop-runs 1
 uv run benchmarks/baseline_qpf.py --child product --day 1-3 --out x.png   # one product, as the example renders it
 uv lock --script benchmarks/baseline_qpf.py
 ```
 
-Proposed for Session 02 (standalone, before the package exists):
+Configured (Session 02, verified 2026-10-08):
 
 ```bash
-uv run benchmarks/prototype_build.py      # write prototype layered file
-uv run benchmarks/prototype_runtime.py    # NumPy/Pillow-only runtime
+uv run benchmarks/prototype_build.py      # author QPF and grid prototype files (png/raw/zlib, plus QPF split variants) → results/prototype-<stamp>/; ~45 s
+uv run benchmarks/prototype_runtime.py    # NumPy/Pillow-only runtime benchmark on the latest build → <build>/runtime-<stamp>/; ~1.5 min
+uv run benchmarks/prototype_compare.py    # compare the latest runtime outputs with full Cartopy renders → <runtime>/compare/
+uv lock --script benchmarks/prototype_build.py   # likewise for prototype_runtime.py and prototype_compare.py
 ```
 
-Session 03 should establish and verify the following proposed package workflow, or update this section to the actual chosen commands:
+Configured (Session 03, verified 2026-10-08; see also `CONTRIBUTING.md`):
 
 ```bash
-uv sync --all-extras --group dev
-uv run ruff format --check .
-uv run ruff check .
-uv run mypy src/cartostack
-uv run pytest
-uv run pytest tests/test_compositor.py::test_name   # single test
-uv build
+uv sync --group dev                          # core-only dev env (NumPy + Pillow); exact, removes extras
+uv sync --extra build --group dev            # plus Matplotlib + Cartopy (build extra)
+uv run ruff format --check .                 # package, tests, scripts (benchmarks and *.md excluded)
+uv run ruff check .                          # whole repo; benchmarks/ has relaxed per-file rules
+uv run mypy                                  # strict, src/cartostack
+uv run pytest                                # build-extra and fixture tests skip when unavailable
+uv run pytest tests/test_package.py::test_import_does_not_load_rendering_libraries   # single test
+uv run scripts/fetch_fixtures.py [--check]   # prepare fixtures (network) / verify offline
+uv build                                     # sdist + wheel
+uv lock --check                              # uv.lock up to date
+uvx --from actionlint-py actionlint          # lint .github/workflows
 ```
+
+Focused (Session 04):
+
+```bash
+uv run pytest tests/test_geometry.py tests/test_manifest.py   # format 1.0 validation, examples, schema agreement
+```
+
+The fixture script moved from `benchmarks/fetch_fixtures.py` to `scripts/fetch_fixtures.py` in Session 03; earlier log entries keep the old path.
 
 Each session must also record its focused verification command once the relevant tests or scripts exist. Session 15 must validate built artifacts independently of the editable development installation.
 
@@ -639,3 +653,165 @@ Next: session ID and the first concrete action.
   - Encoding a 4.1-megapixel image costs 40–70 ms whichever way it is done, so it will become a large share of the runtime.
 - **Remaining/blockers:** None for Session 01b. Open (user decisions): whether `resources/` is committed (it now also contains `slow_example.py`); and whether production should pin Matplotlib < 3.11 or adjust the legend title (outside this repository).
 - **Next:** Session 02. Write `benchmarks/prototype_build.py`: from the QPF scene, render the static-below and flattened static-above layers at the 2210 × 1848 crop, and export the bin table and LCC parameters.
+
+### 2026-10-08 — Session 02 — completed
+
+- **Work:**
+  - Refactored `baseline_qpf.render_product` into `build_figure` + save, and `baseline_cartopy.render` into `build_scene` + draw. Baseline pixel hashes are unchanged (`f6f6d40c…`, `47d69487…`).
+  - Added `benchmarks/prototype_build.py` (build env), `benchmarks/prototype_runtime.py` (PEP 723 with only `numpy==2.5.3` and `pillow==12.3.0`), and `benchmarks/prototype_compare.py` (build env), each with a lockfile.
+  - The build renders each draw group alone (hiding all other artists, keeping originally hidden ones hidden) into transparent RGBA on the identical canvas. It writes ZIP_STORED prototype files containing `manifest.json`, layers, the embedded font, slot data, LCC parameters, and the projected→pixel affine. Each file is written in three encodings: `png`, `raw`, and `zlib`. QPF is also written with the static-above group split into 6 layers.
+  - The runtime includes a NumPy shapefile/DBF reader (input only, timed separately), a NumPy LCC projection, a polygon slot (even-odd fill: Pillow fills each ring, rings are XOR-ed, k× supersampling, coverage blending in draw order, rings clipped to the canvas), a grid slot (index-map gather plus Matplotlib's float32 normalisation and colormap rules), a text slot (Pillow with Matplotlib's layout rule), and Pillow or Agg-exact stacking. Every child process asserts that none of matplotlib, cartopy, shapely, pyproj, geopandas, pyogrio or pandas is in `sys.modules` (276/272 modules loaded for QPF/grid; none forbidden).
+- **Key implementation findings:**
+  - Saving with the resolved tight box as an explicit `Bbox` is byte-identical to `bbox_inches="tight"`. That is how the QPF crop is fixed; it replaces this checklist's "never use tight".
+  - QPF shapefiles are spherical lon/lat, and the baseline's `to_crs(4326)` leaves the coordinates unchanged (max change 0.0°).
+  - The NumPy LCC matches pyproj to 4.4×10⁻⁹ m.
+  - The build first rendered GeoAxes' hidden tick labels into layers (seen in the grid colorbar area) because it forced artists visible. This was fixed by keeping original visibility; afterwards stacking Agg layers reproduces the full render to within 3 levels (QPF) and 5 levels (grid), with nothing over 8.
+  - Text needs Agg's one-pixel upward shift (`dy = -1`) and origin rounding.
+  - Pillow's polygon cost scales with edges × rows. Clipping rings to the canvas cut the Day 1-3 fill from 283 ms to 90 ms (1×), because only ~4 % of the vertices of on-canvas rings are actually on the canvas.
+- **Verification:** `uv run benchmarks/prototype_build.py`, then `uv run benchmarks/prototype_runtime.py`, then `uv run benchmarks/prototype_compare.py`. Inputs compared: all 18 QPF products, each against its own Session 01b full render, and grid variants 0–3, each against `baseline_cartopy.render(variant)` (references in `compare/ref_grid_*.png`). Comparison images inspected: `compare/sheet_*.png` show reference | runtime | 8× difference. `uvx ruff check --line-length 120 benchmarks/` passes. Caches warm (priming run). Two discarded attempts: one crashed while summarising, and one used the hidden-tick-label build. Both were fixed and re-run before these results.
+- **Evidence:** `benchmarks/results/prototype-20261008T155139Z/` (`build.json`, `*.cstack`, `layers/*.png`), `runtime-20261008T155236Z/runtime.json` (every run), and `runtime-20261008T155236Z/compare/compare.json` with diff and sheet images.
+  - **File sizes:**
+
+    | File | png | zlib | raw |
+    | --- | --- | --- | --- |
+    | QPF | 1.13 MB | 1.07 MB | 33.3 MB |
+    | QPF, static-above split into 6 layers | 1.30 MB | 1.28 MB | 115 MB |
+    | Grid | 1.29 MB | 1.28 MB | 12.3 MB |
+
+    The embedded DejaVu font accounts for 0.63 MB of each file.
+  - **Authoring time:** QPF 13.1 s, grid 16.8 s (dominated by Cartopy's first projection).
+  - **Cold runtime, one product per process** (in-process end-to-end plus interpreter start; process wall times additionally include measurement-only extra encodes):
+    - **QPF Day 1-3: 0.33 s with zlib** (0.36 s png, 0.33 s raw), against the 12.23 s baseline: **≈ 37× faster**.
+      - Interpreter 19 ms; imports: numpy 26 ms, Pillow 14 ms.
+      - Load: manifest 0.5 ms; layer decode with png 10.5 + 22.6 ms, zlib 4.7 + 4.1 ms, raw ~0 ms (zero-copy).
+      - Product: input read 5 ms, polygons (2×) 166 ms, text 1.4 ms, stacking 14 ms, PNG RGBA level 6 64 ms. Other encodes: RGBA level 1 49 ms, RGB level 1 38 ms, RGB level 6 52 ms.
+      - Peak RSS 234–237 MiB.
+    - **Grid: 0.12 s with zlib** (0.13 s png), against the 16.20 s baseline: **≈ 130× faster**.
+      - Data 10 ms, text 1.2 ms, stacking 2.5 ms, encode RGB level 6 18 ms.
+      - Index-map load 1.7–3.1 ms; peak RSS 81 MiB.
+  - **QPF loop, 18 products in one process: 3.64 s with zlib** (3.68 s png, 3.60 s raw), against the 32.1 s baseline: **≈ 8.8× faster**.
+    - Per product: median **0.156 s** against the baseline's 0.92 s after its first product (**≈ 5.9× faster**). Polygons 81 ms median (16–321 ms), text 1.4 ms, stacking 12.7 ms, encode 63 ms.
+    - The runtime's first product costs the same as the rest (0.158 s), whereas Cartopy's first takes 11.7 s.
+    - Peak RSS 402–409 MiB.
+    - Polygon resolution: 1× gives a 2.68 s loop (polygons 48 ms median); 4× gives 4.63 s (113 ms).
+  - **Grid, 4 variants in one process:** 0.23 s, 30 ms per product, against the baseline's 0.32 s per warm repetition: **≈ 10.5× faster**.
+  - **Break-even:** authoring pays for itself after about one cold render (QPF 13.1 s ÷ 11.9 s saved; grid 16.8 s ÷ 16.1 s saved), or within a single 18-product QPF run (28.5 s saved).
+  - **Accuracy against each product's own full render** (median over products; "differ" = share of pixels differing by more than 8 levels):
+
+    | Region | Result |
+    | --- | --- |
+    | QPF static opaque | exact |
+    | QPF text (45.8 px) | 0 pixels differ by more than 32 levels (4.9 % differ by more than 8, antialiasing) |
+    | QPF clear map, 1× | 0.55 % differ (0.43 % by more than 32; max 255) |
+    | QPF clear map, 2× | 0.49 % differ (0.23 % by more than 32; max 188) |
+    | QPF clear map, 4× | 0.38 % differ (0.05 % by more than 32; max 140) |
+    | QPF overall (2×) | 0.33 % differ |
+    | Grid data | 2.0 % differ, max 29 levels |
+    | Grid text (16.7 px) | 27 % differ by more than 32 levels |
+
+    - QPF data differences are thin lines along polygon edges (antialiasing approximation), invisible at normal zoom.
+    - Grid data differences are Matplotlib's semi-transparent `pcolormesh` cell seams, which the index-map render does not reproduce.
+    - Grid text differences come from FreeType hinting: Matplotlib forces auto-hinting, which Pillow does not expose, so glyphs are about 1 px taller in Matplotlib. Placement agrees.
+    - Pillow stacking leaves 17 % of QPF pixels differing by 1–3 levels. The Agg-exact option lowers that to 1.4 %, but stacking then costs 291 ms instead of 13 ms per product.
+    - With the split static layers, stacking costs 26 ms instead of 13 ms and 2.4 % of static pixels differ, versus 0.012 % with the flattened layer.
+    - The few "static" outliers (max 114) are subtitle pixels of longer subtitles that fall outside the comparison's text mask, which is derived from the Day 1-3 subtitle.
+- **Decisions:**
+  - (1) Default layer encoding: **zlib**. It gives the smallest file and decodes ~4 ms per 4 MP layer. Raw saves another ~5 ms per load but makes files 31× larger; PNG decodes 3–5× slower.
+  - (2) **Store contiguous static runs pre-flattened by default.** That halves stacking and load time and is more accurate; individual layers stay optional for visibility edits (Session 12).
+  - (3) Polygon supersampling default **2×**; 1× and 4× remain options.
+  - (4) **Pillow stacking** by default; Agg-exact as an option until it is optimised.
+  - (5) Match the PNG mode of the output being replaced: RGBA for QPF, RGB for the grid. Encoding is now **~40 % of a QPF product's runtime**, which triggers the backlog item "PNG encoding dominates recurring runtime" (RGB level 1 would save ~25 ms per product).
+- **Feasibility blockers:** none. Open risks for later sessions:
+  - Small-size text matching (Session 09: decide between a documented tolerance, glyph hinting control through another FreeType binding, or build-time rendering of fixed-size text).
+  - Polygon fill is now the largest per-product cost on complex products (up to 321 ms). Candidates: vertex decimation below the pixel scale, or native filling (profiling-driven, Session 16).
+  - Grid seams differ from Matplotlib by design.
+  - The font dominates file size (subsetting).
+- **Remaining/blockers:** none for Session 02. Open user decisions as before: committing `resources/`, and production Matplotlib < 3.11.
+- **Next:** Session 03. Re-verify `cartostack` on PyPI and conda-forge, then create `pyproject.toml` (Hatchling, Python ≥ 3.12, NumPy/Pillow core, `build` extra).
+
+### 2026-10-08 — Session 03 — completed
+
+- **Work:**
+  - **Name check:** `cartostack` is still free (PyPI JSON API, `api.anaconda.org/package/conda-forge/cartostack`, and `github.com/conda-forge/cartostack-feedstock` all return 404).
+  - **`pyproject.toml`:**
+    - Packaging: Hatchling (`hatchling>=1.27`), version read from `src/cartostack/__init__.py`, `requires-python >=3.12`, MIT licence (SPDX), classifiers for 3.12–3.14, `Typing :: Typed`.
+    - Core dependencies `numpy>=2.0` and `pillow>=10.1` (float font sizes); `build` extra `matplotlib>=3.10` and `cartopy>=0.25`; `dev` group with pytest ≥ 8.3, ruff ≥ 0.15, mypy ≥ 2.0.
+    - sdist limited to `src/`, `tests/`, `scripts/fetch_fixtures.py`, README, LICENSE and pyproject. Wheel contains `src/cartostack` only.
+    - Ruff: line length 100; rules E, W, F, I, UP, B, SIM, RUF, PT, NPY; `resources/` excluded; relaxed per-file rules for `benchmarks/`; formatting excludes `benchmarks/` and `*.md` (Ruff 0.16 would otherwise reformat the code blocks in the design documents).
+    - mypy strict on `src/cartostack`. pytest with `--strict-markers` and `--strict-config`, plus `build` and `fixtures` markers.
+  - **Package and environment:** `uv.lock` (29 packages) and `.python-version` (3.13). Package: `src/cartostack/__init__.py` (`__version__ = "0.0.1.dev0"`, no other modules yet) and `py.typed`.
+  - **Tests:** `tests/conftest.py` blocks network access for every test, auto-skips `build` tests without the extra and `fixtures` tests when fixtures don't verify, and provides `fixture_dir`. `tests/test_package.py` checks the version against metadata, that core requires exactly numpy and pillow, that a fresh-process `import cartostack` loads none of matplotlib, cartopy, pyproj or shapely (and the same with the extra installed), and that network access is blocked. `tests/test_fixtures.py` covers offline verification of missing, changed and present fixtures.
+  - **Fixture script:** moved `benchmarks/fetch_fixtures.py` to `scripts/fetch_fixtures.py` (`git mv`). It gained `fixture_dir()` (`$CARTOSTACK_FIXTURE_DIR`, default `benchmarks/data`), `verify()`, and an offline `--check` mode. The data stays in place so the QPF snapshot is not re-downloaded and replaced by newer forecasts. Benchmark messages were updated to the new path.
+  - **CI:** `.github/workflows/ci.yml` uses checkout v7, setup-uv v10 (uv pinned to 0.12.23) and upload-artifact v7, with these jobs:
+    - lint, format, and types;
+    - core only on Python 3.12, 3.13 and 3.14, asserting the extras are not installed;
+    - lowest direct core dependencies on Python 3.12;
+    - the `build` extra on Python 3.12 and 3.14;
+    - dist: build, install the wheel alone and import it outside the source tree, run the tests from the sdist, and upload the distributions.
+  - **Docs:** added `CONTRIBUTING.md` and updated `CLAUDE.md`'s repository state.
+  - Removed `noqa` comments in benchmarks that only my user-level Ruff config needed (comment-only change).
+- **Verification (local, macOS arm64):**
+  - Core environment (`uv sync --group dev`; numpy and Pillow installed, matplotlib and cartopy not): `uv run ruff format --check .` clean, `uv run ruff check .` clean, `uv run mypy` clean (strict), `uv run pytest` 7 passed and 1 skipped (`build`), `uv lock --check` OK.
+  - `build`-extra environment (`uv sync --extra build --group dev`, adding cartopy 0.26.0, matplotlib 3.11.2, pyproj 3.8.0, shapely 2.2.0): 8 passed. Switching back to core removed both again.
+  - Other interpreters and versions: `uv run --isolated --python 3.12 --group dev pytest` and the same with `--python 3.14` each gave 7 passed and 1 skipped. Lowest direct dependencies (Python 3.12 venv with `uv pip install --resolution lowest-direct .`, giving numpy 2.0.0 and Pillow 10.1.0): 7 passed, 1 skipped.
+  - Distributions: `uv build` gave a 19 kB wheel and a 38 kB sdist with the contents listed above. The wheel installed into a fresh 3.13 venv pulls in only numpy 2.5.3 and Pillow 12.3.0, imports from site-packages outside the repository, and loads no extras. Tests from the unpacked sdist: 6 passed, 2 skipped (fixtures absent, no extra), which also exercises the skip path.
+  - The workflow's dist-job shell steps ran locally verbatim (paths redirected) and passed. `actionlint` 1.7.12 is clean.
+  - `uv run scripts/fetch_fixtures.py --check` passes, and re-running the moved script left `fixtures.json` files, QPF and download records identical.
+- **Evidence:** command outputs above; no benchmark artifacts in this session.
+- **Decisions/deviations:**
+  - Lower bounds numpy 2.0 and Pillow 10.1 are tested in CI. Python 3.12 is the minimum, consistent with Session 00's SPEC 0 reasoning; cartopy 0.26 has wheels for 3.11–3.15, so 3.14 is tested.
+  - CI targets ubuntu-latest only for now; cross-platform smoke tests are part of Session 15.
+  - Fixture-dependent tests skip in CI because fixtures are gitignored and partly local (SWRCC). Sessions that need them in CI must add small committed fixtures or a cached download.
+  - The README (the 1,900-line proposal) is the package's long description for now; Session 14 separates a quickstart.
+- **Remaining/blockers:** CI has not run on GitHub yet; it runs when these files are pushed, which needs the user's approval to commit and push. Open user decisions as before: committing `resources/` (not tracked), and production Matplotlib < 3.11.
+- **Next:** Session 04. Write `docs/format.md` (container, canvas geometry including the output crop, georeferencing, layer, grid, polygon and text slot records) from the Session 02 prototype manifest, then `cartostack/geometry.py` with validation tests.
+
+### 2026-10-08 — Session 04 — completed
+
+- **Work:**
+  - `docs/format.md` (format **1.0**) covers:
+    - the container: ZIP with a `mimetype` member first, everything ZIP_STORED, `manifest.json`, member-name rules, and a `members` table with byte sizes and SHA-256;
+    - versioning: reject other MAJOR versions first; MINOR versions only add optional fields; unknown fields are ignored and preserved; a new kind or encoding needs a new MAJOR;
+    - geometry: canvas with dpi, the resolved axes rectangle, `clip: "axes"`, and a `figure` record whose `crop_in` represents the fixed output crop with the canvas being the cropped output;
+    - georeference: `crs.proj4`/`wkt`, `projection` as plain PROJ-named numbers (LCC supported; other names make polygon slots invalid), `projected_extent`, and the `world_to_pixel` affine. Lon/lat are taken on the projection's ellipsoid;
+    - consistency rules and a canonical-JSON SHA-256 geometry fingerprint;
+    - layers: common fields, stacking ties broken by array order, straight-alpha source-over compositing, and the encodings `rgba8+zlib` (default), `rgba8`, `png`, `i32le+zlib`, `i32le`;
+    - raster and colorbar layers (colorbar redraw parameters deferred to 1.1 / Session 11);
+    - grid slots, with Matplotlib's float32 `Normalize`/`Colormap` rules and LUT rows under/over/bad;
+    - polygon slots: first-match closed-open bins, `round_decimals`, fallback, ordering by bin order then input order, even-odd fill, k×k coverage supersampling, clipping;
+    - text slots: Matplotlib's layout rule written out, snap, offset, rotation 0;
+    - optional provenance, the validation contract, and a table mapping the Session 02 prototype to 1.0, with deferred items listed.
+  - `src/cartostack/errors.py`: `CartoStackError`, `FormatError` (carries every problem), `GeometryError`, `UnsupportedVersionError`.
+  - `src/cartostack/_validate.py`: field readers that collect problems.
+  - `src/cartostack/geometry.py`: frozen `Rect`, `FigureCrop`, `Projection`, `Georeference` (`to_pixel`/`to_world`), and `CanvasGeometry` (`from_dict`/`to_dict`, `fingerprint`, `compatible_with`; validated in `__post_init__`).
+  - `src/cartostack/manifest.py`: `parse_manifest` / `validate_manifest` returning frozen typed records (`RasterLayer`, `ColorbarLayer`, `GridSlot`, `PolygonSlot`, `TextSlot`, `Manifest.draw_order()`, read-only `members`), plus `load_schema()`.
+  - `src/cartostack/schemas/manifest-1.schema.json`: JSON Schema draft 2020-12, structural only, shipped in the wheel.
+  - `docs/examples/{qpf,grid,minimal}.manifest.json`. QPF and grid are the Session 02 prototype files translated to 1.0, with real member sizes and digests.
+  - Tests: `tests/test_geometry.py` (17 tests) and `tests/test_manifest.py` (60 cases).
+  - `jsonschema>=4.23` added to the dev group; the README's provisional manifest sketch now points to the spec.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 6 files) and `uv lock --check` all pass.
+  - `uv run pytest`: 85 passed and 1 skipped core-only; 86 passed with `--extra build`.
+  - The tests cover:
+    - the examples validated by both the JSON Schema and `parse_manifest`, and the schema itself checked as valid draft 2020-12;
+    - a pinned fingerprint, its independence from key order, number spelling and unknown fields, and its sensitivity to geometry changes;
+    - immutability;
+    - invalid dimensions, DPI, and axes;
+    - figure crop and georeference/axes inconsistencies, a non-invertible affine, LCC parameter rules, and an unknown projection;
+    - version rules: other majors rejected first, 1.7 with unknown fields read, malformed versions rejected;
+    - 24 inconsistent-record cases, each also asserting whether the JSON Schema rejects it (schema rejections are always a subset of the parser's);
+    - collecting all problems, and parsing in a fresh process without loading numpy, PIL, or any extra.
+  - The built wheel contains the schema; installed alone, it loads the schema and parses the QPF example without numpy.
+  - Review against the prototype: `docs/format.md` §13 maps every Session 02 manifest field to 1.0, and the translated prototype manifests validate.
+- **Bugs found by the tests and fixed:**
+  - With invalid geometry, layers using default sizes reported spurious "width/height got None" errors.
+  - A missing required field was reported twice.
+- **Decisions/deviations:**
+  - The canvas is the (cropped) output image. The crop is recorded in `figure.crop_in` rather than applied to integer-placed layers, because the tight crop's origin is fractional (432.05 px for QPF).
+  - Layer kind `polygon` was added beside the planned raster, grid, text and colorbar.
+  - Member checksums live in one `members` table instead of per layer.
+  - Grid `alpha` is stored as a float with the 8-bit rule `floor(alpha·255 + 0.5)` (Agg's conversion).
+  - Canvas size limit 100 000 px.
+  - The member, encoding and LUT-row decoding checks, and the `mimetype` check, are left to the Session 05 reader.
+- **Remaining/blockers:** none for Session 04. CI is still unverified on GitHub until a push. Open user decisions as before.
+- **Next:** Session 05. Implement `cartostack/io.py`: an atomic writer (mimetype first, ZIP_STORED, members table) and an eager reader (version first, digests, encodings), with layer objects owning `uint8` RGBA buffers and round-trip tests.

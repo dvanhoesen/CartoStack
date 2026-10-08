@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cartostack"
+dynamic = ["version"]
+description = "Layered map files (.cstack) rendered by a NumPy/Pillow-only runtime."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Daniel Van Hoesen", email = "danielvanhoesen@gmail.com" }]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Scientific/Engineering :: Visualization",
+    "Typing :: Typed",
+]
+# The runtime depends only on these two; nothing else may be imported by `import cartostack`.
+dependencies = [
+    "numpy>=2.0",
+    "pillow>=10.1",  # float font sizes (text slots)
+]
+
+[project.optional-dependencies]
+# Build-time authoring of .cstack files (cartostack.build); never imported by the runtime.
+build = [
+    "matplotlib>=3.10",
+    "cartopy>=0.25",
+]
+
+[project.urls]
+Repository = "https://github.com/dvanhoesen/GeoScene"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.15",
+    "mypy>=2.0",
+    "jsonschema>=4.23",
+]
+
+[tool.hatch.version]
+path = "src/cartostack/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/cartostack",
+    "tests",
+    "scripts/fetch_fixtures.py",  # tests/conftest.py imports its offline verification
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cartostack"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["resources"]  # user-supplied reference material
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RUF", "PT", "NPY"]
+
+[tool.ruff.lint.per-file-ignores]
+# Standalone PEP 723 experiment scripts: timestamps precede imports; long measurement lines.
+"benchmarks/*" = ["E402", "E501", "E731", "SIM", "B", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.format]
+# Benchmarks are frozen experiment records and the .md files are design documents;
+# format the package, tests, and scripts only.
+exclude = ["benchmarks/*", "*.md"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src/cartostack"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "build: needs the `build` extra (Matplotlib, Cartopy); skipped when it is not installed",
+    "fixtures: needs prepared fixtures (scripts/fetch_fixtures.py); skipped when absent",
+]
+xfail_strict = true

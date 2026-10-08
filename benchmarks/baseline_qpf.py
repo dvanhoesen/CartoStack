@@ -16,7 +16,7 @@
 
 The drawing code is ported from ``resources/slow_example.py`` without changing
 what it draws. Downloading and extracting the WPC tarballs is replaced by
-reading the snapshot in ``benchmarks/data/qpf/`` (``fetch_fixtures.py``), and the
+reading the snapshot in ``benchmarks/data/qpf/`` (``scripts/fetch_fixtures.py``), and the
 SWRCC GeoPackages and logo come from ``benchmarks/data/swrcc/``. Network access
 is blocked in the render processes.
 
@@ -167,7 +167,7 @@ def load_static() -> tuple[dict, dict[str, float]]:
 def product_shapefile(day: str) -> Path:
     shapefiles = sorted((QPF_DIR / f"day_{day}").glob("*.shp"))
     if not shapefiles:
-        sys.exit(f"no QPF shapefile for day {day}; run fetch_fixtures.py")
+        sys.exit(f"no QPF shapefile for day {day}; run scripts/fetch_fixtures.py")
     return shapefiles[0]
 
 
@@ -179,7 +179,7 @@ def parse_valid_time(side):
     side = side.strip()
     hour_str, date_str = side.split()  # '12Z', '12/10/25'
     z_hour = int(hour_str[:-1])
-    dt = dt_cls.strptime(date_str, "%m/%d/%y").replace(hour=z_hour)  # noqa: DTZ007 (as example)
+    dt = dt_cls.strptime(date_str, "%m/%d/%y").replace(hour=z_hour)
     return pytz.utc.localize(dt).astimezone(pytz.timezone("America/New_York"))
 
 
@@ -196,7 +196,7 @@ def read_product(day: str) -> dict:
     product = first_row.get("PRODUCT", "Unknown Product")
     valid_time = first_row.get("VALID_TIME", "")
     issue_time = first_row.get("ISSUE_TIME", "")
-    issue_dt = utc.localize(dt_cls.strptime(issue_time, "%Y-%m-%d %H:%M:%S"))  # noqa: DTZ007
+    issue_dt = utc.localize(dt_cls.strptime(issue_time, "%Y-%m-%d %H:%M:%S"))
     issue_str = issue_dt.astimezone(eastern).strftime("%-I:%M %p %b %-d")
     left_str, right_str = valid_time.split(" - ")
     start_est = parse_valid_time(left_str)
@@ -216,10 +216,11 @@ def read_product(day: str) -> dict:
     }
 
 
-def render_product(static: dict, prod: dict) -> dict:
-    """Draw and save one product exactly as the example does (lines 253-411).
+def build_figure(static: dict, prod: dict) -> dict:
+    """Build one product's figure exactly as the example does (lines 253-407).
 
-    Returns phase timings, the PNG bytes from ``savefig``, and geometry.
+    Returns the figure, its artists by draw group, and build timings; nothing
+    is drawn yet. ``render_product`` saves it; Session 02 renders layers from it.
     """
     import cartopy.crs as ccrs
     import matplotlib.patches as mpatches
@@ -257,6 +258,7 @@ def render_product(static: dict, prod: dict) -> dict:
 
     t = time.perf_counter()
     n_polygons = n_artists = 0
+    data_artists = []
     for _, row in qpf_data.iterrows():
         geom = row.geometry
         qpf_value = row.get("QPF", None)
@@ -279,6 +281,7 @@ def render_product(static: dict, prod: dict) -> dict:
         artist = ax.add_geometries(geoms, crs=ccrs.PlateCarree(), facecolor=color,
                                    edgecolor="none", linewidth=0.5, zorder=layer_zorder)
         timer.wrap(artist, "data")
+        data_artists.append(artist)
         n_polygons += len(geoms)
         n_artists += 1
     phases["build_data"] = time.perf_counter() - t
@@ -371,10 +374,26 @@ def render_product(static: dict, prod: dict) -> dict:
     attrib = ax.text(0.02, 0.02, "Data Source: NWS WPC Quantitative Precipitation Forecast",
                      fontsize=8, transform=ax.transAxes, horizontalalignment="left",
                      verticalalignment="bottom",
-                     bbox=dict(boxstyle="square,pad=0.4", fc="w", ec="0.7", alpha=1, lw=0.5))  # noqa: C408
+                     bbox=dict(boxstyle="square,pad=0.4", fc="w", ec="0.7", alpha=1, lw=0.5))
     attrib.set_zorder(1000)
     timer.wrap(attrib, "decorations")
     phases["build_decorations"] = time.perf_counter() - t
+    return {
+        "fig": fig, "ax": ax, "timer": timer, "phases": phases, "legend": legend,
+        "attrib": attrib, "subtitle": subtitle_attrib, "data_artists": data_artists,
+        "n_rows": len(qpf_data), "n_polygons": n_polygons, "n_data_artists": n_artists,
+    }
+
+
+def render_product(static: dict, prod: dict) -> dict:
+    """Draw and save one product exactly as the example does (lines 253-411).
+
+    Returns phase timings, the PNG bytes from ``savefig``, and geometry.
+    """
+    import matplotlib.pyplot as plt
+
+    scene = build_figure(static, prod)
+    fig, ax, timer, phases = scene["fig"], scene["ax"], scene["timer"], scene["phases"]
 
     # savefig(dpi=300, bbox_inches="tight") draws twice: once with drawing
     # disabled to find the tight box, then for real at 300 DPI. Group times
@@ -387,15 +406,15 @@ def render_product(static: dict, prod: dict) -> dict:
         phases[f"draw_{group}"] = timer.draw[group]
     phases["savefig_other"] = phases["savefig_total"] - sum(timer.draw.values())
 
-    geometry = output_geometry(fig, ax, legend, attrib)
+    geometry = output_geometry(fig, ax, scene["legend"], scene["attrib"])
     # The example never closes its figures; neither does this port.
     return {
         "phases_s": phases,
         "png": buf.getvalue(),
         "geometry": geometry,
-        "n_rows": len(qpf_data),
-        "n_polygons": n_polygons,
-        "n_data_artists": n_artists,
+        "n_rows": scene["n_rows"],
+        "n_polygons": scene["n_polygons"],
+        "n_data_artists": scene["n_data_artists"],
         "n_open_figures": len(plt.get_fignums()),
     }
 
@@ -590,14 +609,14 @@ def run_child(argv: list[str]) -> dict:
 def check_fixtures() -> dict:
     manifest_path = DATA / "fixtures.json"
     if not manifest_path.exists():
-        sys.exit("benchmarks/data/fixtures.json missing; run: uv run benchmarks/fetch_fixtures.py")
+        sys.exit("benchmarks/data/fixtures.json missing; run: uv run scripts/fetch_fixtures.py")
     manifest = json.loads(manifest_path.read_text())
     if "qpf" not in manifest:
-        sys.exit("no QPF snapshot in fixtures.json; re-run fetch_fixtures.py")
+        sys.exit("no QPF snapshot in fixtures.json; re-run scripts/fetch_fixtures.py")
     for entry in manifest["files"]:
         path = DATA / entry["path"]
         if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
-            sys.exit(f"fixture missing or changed: {path}; re-run fetch_fixtures.py")
+            sys.exit(f"fixture missing or changed: {path}; re-run scripts/fetch_fixtures.py")
     return manifest
 
 

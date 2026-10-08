@@ -1,0 +1,57 @@
+{
+  "format": "cartostack",
+  "format_version": "1.0",
+  "geometry": {
+    "canvas": {
+      "width": 640,
+      "height": 480,
+      "dpi": 100.0
+    },
+    "axes": {
+      "left": 0.0,
+      "top": 0.0,
+      "width": 640.0,
+      "height": 480.0
+    }
+  },
+  "geometry_fingerprint": "sha256:22e73497bcc6c025344e1020a4fb519fd99cc06d7312b004bf92dde16f277662",
+  "members": {
+    "layers/background.png": {
+      "bytes": 25,
+      "sha256": "0b399d2253cb4e1c85c15b9ececdd2b7d56687ce95ed1cddca6e5962628ee664"
+    },
+    "fonts/DejaVuSans.ttf": {
+      "bytes": 756072,
+      "sha256": "3fdf69cabf06049ea70a00b5919340e2ce1e6d02b0cc3c4b44fb6801bd1e0d22"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "kind": "raster",
+      "order": 0,
+      "member": "layers/background.png",
+      "encoding": "png"
+    },
+    {
+      "id": "title",
+      "kind": "text",
+      "order": 1,
+      "text": {
+        "value": "Hello",
+        "font": "fonts/DejaVuSans.ttf",
+        "size_px": 24.0,
+        "color": [
+          0,
+          0,
+          0,
+          255
+        ],
+        "x": 320.0,
+        "y": 20.0,
+        "ha": "center",
+        "va": "top"
+      }
+    }
+  ]
+}
