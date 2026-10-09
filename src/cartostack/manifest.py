@@ -31,7 +31,7 @@ RASTER_ENCODINGS: Final = ("rgba8+zlib", "rgba8", "png")
 INDEX_ENCODINGS: Final = ("i32le+zlib", "i32le")
 LUT_ENCODINGS: Final = ("rgba8+zlib", "rgba8")
 TEXT_HA: Final = ("left", "center", "right")
-TEXT_VA: Final = ("top", "center", "baseline", "bottom")
+TEXT_VA: Final = ("top", "center", "baseline", "bottom", "center_baseline")
 
 _ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 _MEMBER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*")
@@ -81,8 +81,41 @@ class RasterLayer(Layer):
 
 
 @dataclass(frozen=True)
+class ColorbarRedrawRecord:
+    """``colorbar.redraw``: the parts needed to redraw a colorbar (``docs/format.md`` §7)."""
+
+    orientation: str
+    box: tuple[float, float, float, float]
+    rows_member: str
+    rows_encoding: str
+    n_colors: int
+    under_member: str | None
+    under_encoding: str | None
+    over_member: str | None
+    over_encoding: str | None
+    label_member: str | None
+    label_encoding: str | None
+    label_edge: float
+    locator: str
+    nbins: int
+    steps: tuple[float, ...]
+    values: tuple[float, ...]
+    side: str
+    direction: str
+    tick_length: float
+    tick_width: float
+    tick_color: tuple[int, int, int, int]
+    font: str
+    size_px: float
+    label_color: tuple[int, int, int, int]
+    pad: float
+    minus: str
+
+
+@dataclass(frozen=True)
 class ColorbarLayer(Layer):
     slot: str  # the grid slot whose normalisation and colormap it shows
+    redraw: ColorbarRedrawRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -277,13 +310,16 @@ def _layers(
     out: list[Layer] = []
     seen: dict[str, int] = {}
     for i, raw in enumerate(items):
+        # Duplicates are found from the raw ids, so an otherwise invalid layer still counts.
+        rid = raw.get("id") if isinstance(raw, Mapping) else None
+        if isinstance(rid, str):
+            if rid in seen:
+                p.add(f"layers[{i}].id", f"duplicates layers[{seen[rid]}].id {rid!r}")
+            else:
+                seen[rid] = i
         layer = _layer(p, f"layers[{i}]", i, raw, geometry, members)
-        if layer is None:
-            continue
-        if layer.id in seen:
-            p.add(f"layers[{i}].id", f"duplicates layers[{seen[layer.id]}].id {layer.id!r}")
-        seen[layer.id] = i
-        out.append(layer)
+        if layer is not None:
+            out.append(layer)
     grids = {layer.id for layer in out if isinstance(layer, GridSlot)}
     for layer in out:
         if isinstance(layer, ColorbarLayer) and layer.slot not in grids:
@@ -381,7 +417,7 @@ def _layer(
     if kind == "raster":
         return RasterLayer(**common)
     if kind == "colorbar":
-        return _colorbar(p, path, r, common)
+        return _colorbar(p, path, r, common, members)
     if kind == "grid":
         return _grid(p, path, r, common, members)
     if kind == "polygon":
@@ -394,14 +430,134 @@ def _section(p: v.Problems, path: str, r: Mapping[str, Any], key: str) -> Mappin
 
 
 def _colorbar(
-    p: v.Problems, path: str, r: Mapping[str, Any], common: Mapping[str, Any]
+    p: v.Problems,
+    path: str,
+    r: Mapping[str, Any],
+    common: Mapping[str, Any],
+    members: Mapping[str, Member] | None,
 ) -> ColorbarLayer | None:
     s = _section(p, path, r, "colorbar")
     if s is None:
         return None
     sp = v.join(path, "colorbar")
     slot = v.string(p, v.join(sp, "slot"), v.get(p, s, "slot", sp), pattern=_ID)
-    return None if slot is None else ColorbarLayer(**common, slot=slot)
+    raw = v.get(p, s, "redraw", sp, None)
+    n = len(p.items)
+    redraw = None if raw is None else _redraw(p, v.join(sp, "redraw"), raw, members)
+    if slot is None or len(p.items) > n:
+        return None
+    return ColorbarLayer(**common, slot=slot, redraw=redraw)
+
+
+def _member_ref(
+    p: v.Problems, path: str, data: object, members: Mapping[str, Member] | None,
+    encodings: tuple[str, ...],
+) -> tuple[str | None, str | None]:  # fmt: skip
+    ref = v.obj(p, path, data)
+    if ref is None:
+        return None, None
+    member = _ref(p, v.join(path, "member"), v.get(p, ref, "member", path), members)
+    encoding = v.string(
+        p, v.join(path, "encoding"), v.get(p, ref, "encoding", path), choices=encodings
+    )
+    return member, encoding
+
+
+def _redraw(
+    p: v.Problems, path: str, data: object, members: Mapping[str, Member] | None
+) -> ColorbarRedrawRecord | None:
+    d = v.obj(p, path, data)
+    if d is None:
+        return None
+    n = len(p.items)
+    orientation = v.string(p, v.join(path, "orientation"), v.get(p, d, "orientation", path),
+                           choices=("horizontal", "vertical"))  # fmt: skip
+    box = v.numbers(p, v.join(path, "box"), v.get(p, d, "box", path), 4)
+    if box is not None and not (box[2] > 0 and box[3] > 0):
+        p.add(v.join(path, "box"), "needs a positive width and height")
+    rp = v.join(path, "rows")
+    rows = v.obj(p, rp, v.get(p, d, "rows", path))
+    rows_member = rows_encoding = n_colors = None
+    if rows is not None:
+        rows_member, rows_encoding = _member_ref(p, rp, rows, members, INDEX_ENCODINGS)
+        n_colors = v.integer(
+            p, v.join(rp, "n_colors"), v.get(p, rows, "n_colors", rp), lo=1, hi=65536
+        )
+    under: tuple[str | None, str | None] = (None, None)
+    over: tuple[str | None, str | None] = (None, None)
+    label: tuple[str | None, str | None] = (None, None)
+    if v.get(p, d, "under", path, None) is not None:
+        under = _member_ref(p, v.join(path, "under"), d["under"], members, RASTER_ENCODINGS)
+    if v.get(p, d, "over", path, None) is not None:
+        over = _member_ref(p, v.join(path, "over"), d["over"], members, RASTER_ENCODINGS)
+    if v.get(p, d, "label", path, None) is not None:
+        label = _member_ref(p, v.join(path, "label"), d["label"], members, RASTER_ENCODINGS)
+    label_edge = v.number(p, v.join(path, "label_edge"), v.get(p, d, "label_edge", path, 0.0))
+    tp = v.join(path, "ticks")
+    t = v.obj(p, tp, v.get(p, d, "ticks", path)) or {}
+    locator = v.string(
+        p, v.join(tp, "locator"), v.get(p, t, "locator", tp, "auto"), choices=("auto", "fixed")
+    )
+    nbins = v.integer(p, v.join(tp, "nbins"), v.get(p, t, "nbins", tp, 9), lo=1)
+    steps_raw = v.array(p, v.join(tp, "steps"), v.get(p, t, "steps", tp, [1, 2, 2.5, 5, 10]))
+    steps = (
+        None if steps_raw is None else v.numbers(p, v.join(tp, "steps"), steps_raw, len(steps_raw))
+    )
+    if steps is not None and (len(steps) < 2 or steps[0] != 1 or steps[-1] != 10):
+        p.add(v.join(tp, "steps"), "must start at 1 and end at 10")
+    values_raw = v.array(p, v.join(tp, "values"), v.get(p, t, "values", tp, []))
+    values = (
+        None
+        if values_raw is None
+        else v.numbers(p, v.join(tp, "values"), values_raw, len(values_raw))
+    )
+    side = v.string(p, v.join(tp, "side"), v.get(p, t, "side", tp, "bottom"),
+                    choices=("bottom", "top", "left", "right"))  # fmt: skip
+    direction = v.string(p, v.join(tp, "direction"), v.get(p, t, "direction", tp, "out"),
+                         choices=("out", "in", "inout"))  # fmt: skip
+    length = v.number(p, v.join(tp, "length"), v.get(p, t, "length", tp), lo=0)
+    width = v.number(p, v.join(tp, "width"), v.get(p, t, "width", tp), lo=0)
+    tick_color = v.color(p, v.join(tp, "color"), v.get(p, t, "color", tp, [0, 0, 0, 255]))
+    lp = v.join(path, "labels")
+    lab = v.obj(p, lp, v.get(p, d, "labels", path)) or {}
+    font = _ref(p, v.join(lp, "font"), v.get(p, lab, "font", lp), members)
+    size_px = v.number(p, v.join(lp, "size_px"), v.get(p, lab, "size_px", lp), lo=0, lo_open=True)
+    label_color = v.color(p, v.join(lp, "color"), v.get(p, lab, "color", lp, [0, 0, 0, 255]))
+    pad = v.number(p, v.join(lp, "pad"), v.get(p, lab, "pad", lp, 0.0), lo=0)
+    minus = v.string(p, v.join(lp, "minus"), v.get(p, lab, "minus", lp, "\u2212"))
+    if len(p.items) > n:
+        return None
+    required = (orientation, box, rows_member, rows_encoding, n_colors, locator, nbins, steps,
+                values, side, direction, length, width, tick_color, font, size_px, label_color,
+                pad, minus)  # fmt: skip
+    if any(x is None for x in required):
+        return None
+    assert orientation is not None
+    assert box is not None
+    assert rows_member is not None
+    assert rows_encoding is not None
+    assert n_colors is not None
+    assert locator is not None
+    assert nbins is not None
+    assert steps is not None
+    assert values is not None
+    assert side is not None
+    assert direction is not None
+    assert length is not None
+    assert width is not None
+    assert tick_color is not None
+    assert font is not None
+    assert size_px is not None
+    assert label_color is not None
+    assert pad is not None
+    assert minus is not None
+    assert label_edge is not None
+    return ColorbarRedrawRecord(
+        orientation, (box[0], box[1], box[2], box[3]), rows_member, rows_encoding, n_colors,
+        under[0], under[1], over[0], over[1], label[0], label[1], label_edge, locator, nbins,
+        steps, values, side, direction, length, width, tick_color, font, size_px, label_color,
+        pad, minus,
+    )  # fmt: skip
 
 
 def _grid(

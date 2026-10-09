@@ -11,7 +11,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
+/build/
 develop-eggs/
 dist/
 downloads/
@@ -237,3 +237,6 @@ CLAUDE.md
 # CartoStack benchmark fixtures and outputs
 benchmarks/data/
 benchmarks/results/
+
+# Example output (examples/README.md)
+/out/

@@ -1,12 +1,11 @@
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=25.1"]
 build-backend = "hatchling.build"
 
 [project]
 name = "cartostack"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 description = "Layered map files (.cstack) rendered by a NumPy/Pillow-only runtime."
-readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Daniel Van Hoesen", email = "danielvanhoesen@gmail.com" }]
@@ -31,12 +30,16 @@ dependencies = [
 [project.optional-dependencies]
 # Build-time authoring of .cstack files (cartostack.build); never imported by the runtime.
 build = [
-    "matplotlib>=3.10",
-    "cartopy>=0.25",
+    # Lowest versions verified (Session 15): Matplotlib 3.11.0's colorbars differ from what
+    # the runtime redraws, and with Cartopy 0.25 the authored georeference is wrong.
+    "matplotlib>=3.11.1",  # text slots reproduce Matplotlib 3.11's text layout
+    "cartopy>=0.26",
 ]
 
 [project.urls]
-Repository = "https://github.com/dvanhoesen/GeoScene"
+Repository = "https://github.com/dvanhoesen/CartoStack"
+Documentation = "https://github.com/dvanhoesen/CartoStack/blob/main/docs/api.md"
+"Format specification" = "https://github.com/dvanhoesen/CartoStack/blob/main/docs/format.md"
 
 [dependency-groups]
 dev = [
@@ -49,12 +52,34 @@ dev = [
 [tool.hatch.version]
 path = "src/cartostack/__init__.py"
 
+# The PyPI description is README.md with relative links made absolute (GitHub renders the
+# relative ones; PyPI cannot resolve them). Images point at raw files on main.
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '!\[([^\]]*)\]\((?!https?://)([^)]+)\)'
+replacement = '![\1](https://raw.githubusercontent.com/dvanhoesen/CartoStack/main/\2)'
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '(?<!!)\[([^\]]*)\]\((?!https?://|#)([^)]+)\)'
+replacement = '[\1](https://github.com/dvanhoesen/CartoStack/blob/main/\2)'
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/cartostack",
     "tests",
     "scripts/fetch_fixtures.py",  # tests/conftest.py imports its offline verification
+    "examples",  # tests/test_examples.py runs the runtime examples
+    "docs/api.md",
+    "docs/format.md",
+    "docs/examples",
+    "docs/images",
     "README.md",
+    "CONTRIBUTING.md",
     "LICENSE",
     "pyproject.toml",
 ]
@@ -83,6 +108,12 @@ exclude = ["benchmarks/*", "*.md"]
 strict = true
 python_version = "3.12"
 files = ["src/cartostack"]
+
+[[tool.mypy.overrides]]
+# Build-extra libraries (cartostack.build only): Cartopy ships no type information, and
+# none of these is installed in the core-only environment.
+module = ["cartopy", "cartopy.*", "matplotlib", "matplotlib.*", "pyproj", "pyproj.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

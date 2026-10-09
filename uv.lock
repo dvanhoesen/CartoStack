@@ -167,8 +167,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cartopy", marker = "extra == 'build'", specifier = ">=0.25" },
-    { name = "matplotlib", marker = "extra == 'build'", specifier = ">=3.10" },
+    { name = "cartopy", marker = "extra == 'build'", specifier = ">=0.26" },
+    { name = "matplotlib", marker = "extra == 'build'", specifier = ">=3.11.1" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pillow", specifier = ">=10.1" },
 ]

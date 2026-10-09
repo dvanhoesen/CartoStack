@@ -1,24 +1,26 @@
 # CartoStack build sessions
 
-This is the implementation checklist and handoff record for building CartoStack one session at a time. `README.md` remains the architectural proposal; this file records what has actually been built and verified. Proposed paths, APIs, and commands below become authoritative only when their session implements them.
+This is the implementation checklist and handoff record for building CartoStack one session at a time. `docs/design.md` (the README until Session 14) is the architectural proposal; `README.md`, `docs/api.md` and `docs/format.md` describe what exists; this file records what has actually been built and verified. Proposed paths, APIs, and commands below become authoritative only when their session implements them.
 
 **Objective.** CartoStack is a layered map file (`.cstack`): N×M RGBA layers plus metadata describing each layer, the canvas, and how geographic data maps to pixels. A lightweight runtime that needs only NumPy and Pillow loads the file, swaps in or adds only the new data (grid values, classified polygons, text), stacks the layers, and writes the image, much faster than building the map with Matplotlib and Cartopy. Matplotlib and Cartopy are build-time authoring tools; they are never imported on the runtime path. Performance comes from the file design and the small runtime, not from caching inside a Matplotlib workflow.
 
 ## Current handoff
 
-- Last updated: 2026-10-08.
+- Last updated: 2026-10-09.
 - Active session: none.
-- Last completed session: **04 — `.cstack` format specification v1** (2026-10-08).
-- Next implementation session: **05 — Core reader/writer and layer model**.
-- Repository implementation state: installable `cartostack` package skeleton (`pyproject.toml`, `uv.lock`, `src/cartostack/` with `errors.py`, `geometry.py`, `manifest.py` (format 1.0 validation, plain Python) and `schemas/manifest-1.schema.json`, `docs/format.md` and `docs/examples/`, `tests/`, `.github/workflows/ci.yml`, `CONTRIBUTING.md`); no reader/writer or rendering modules yet. Shared fixture script `scripts/fetch_fixtures.py`. Configured standalone benchmarks (PEP 723, each with a `.lock` file): `baseline_cartopy.py` (synthetic grid), `baseline_qpf.py` (QPF), and the Session 02 prototype `prototype_build.py`, `prototype_runtime.py` (NumPy + Pillow only), `prototype_compare.py`. Reference results (gitignored): `benchmarks/results/20261008T145213Z/` (grid), `qpf-20261008T152044Z/` (QPF), `prototype-20261008T155139Z/` (prototype files, runtime and comparison).
-- Before starting Session 05: build the reader/writer on `cartostack.manifest.parse_manifest` and the encodings in `docs/format.md` §2 and §6.3 (`mimetype` first, ZIP_STORED, member size and SHA-256 checks, atomic writes, preserving unknown fields). CI has still not run on GitHub; it runs on the first push (needs the user's approval). Still undecided: whether `resources/` is committed.
+- Last completed session: **15 — Distribution validation and v0.1 readiness** (2026-10-09). **v0.1 is release-ready pending maintainer actions** (`CONTRIBUTING.md` → "Releasing"): commit, merge to `main` and push, set the version, publish (TestPyPI first). Publishing needs an explicit request.
+- Next implementation session: **16 — Workload profiling and next extension decision**. Sessions are listed in the index in execution order.
+- Repository implementation state: installable `cartostack` package skeleton (`pyproject.toml`, `uv.lock`, `src/cartostack/` with `errors.py`, `geometry.py`, `manifest.py` (format 1.0 validation, plain Python), `schemas/manifest-1.schema.json`, `layers.py` (immutable layer objects), `io.py` (encodings, verified and atomic archive I/O), `compositor.py` (source-over stacking, placement, flattened-run reuse, PNG encoding), `projection.py` (NumPy LCC), `polygons.py` (exact even-odd polygon fill, classification, GeoJSON-like input), `grids.py` (Matplotlib-exact normalisation and colormap, index-map gather), `colorbars.py` (colorbar redraw: Matplotlib-exact ticks and labels), `text.py` + `_opentype.py` (Matplotlib 3.11 text layout with GPOS kerning and GSUB ligatures, Pillow rendering) and `scene.py` (`Scene.load`/`save`/`render`/`save_png`, the editing API `replace_layer`, `add_layer`, `remove_layer`, `update_layer`, `show`/`hide`, plus `replace_polygons`, `replace_grid`, `stale_colorbars`, `redraw_colorbar`, `replace_text` and `scene.text[...]`); `cartostack.build` (the `build` extra: `SceneBuilder`, `georef.py`, `index_map.py`); `docs/format.md` and `docs/examples/`, `tests/`, `CONTRIBUTING.md`). All slot kinds render, and scenes are authored from Matplotlib/Cartopy figures. Shared fixture script `scripts/fetch_fixtures.py`. Configured standalone benchmarks (PEP 723, each with a `.lock` file): `baseline_cartopy.py` (synthetic grid), `baseline_qpf.py` (QPF), and the Session 02 prototype `prototype_build.py`, `prototype_runtime.py` (NumPy + Pillow only), `prototype_compare.py`. Reference results (gitignored): `benchmarks/results/20261008T145213Z/` (grid), `qpf-20261008T152044Z/` (QPF), `prototype-20261008T155139Z/` (prototype files, runtime and comparison), `compositor-20261008T181244Z/` (Session 06 compositing/encoding timing).
+- Benchmark figures: `uv run benchmarks/report.py` → `benchmarks/results/report-<stamp>/` (`index.md` lists the figures and tables). The current report is `report-20261009T193920Z/`. Its package series come from the **authored** files (QPF: `authored-20261009T174311Z/` → `package-qpf-20261009T193907Z/`; grid with a colorbar layer: `authored-20261009T185718Z/` → `package-grid-20261009T193917Z/`); the QPF 1×/2× comparison records still come from `package-qpf-20261009T165539Z/`, because the report keeps the newest native record per series, workload, mode and config. Speed-ups on the report's common basis (all series exclude measurement-only work and process exit) are smaller than some Session 02 log figures, which compared the baseline's process wall with the prototype's in-process time: QPF cold 35.7× (log ≈ 37×), QPF 18-product loop 7.6× (log ≈ 8.8×), QPF per product 5.8×, grid cold 131.5×, grid warm 8.1× (log ≈ 10.5×). Quote the report's numbers from now on.
+- Polygon slots (Session 08b) are exact rather than Pillow-approximated: `cartostack.polygons` fills by the format's sample-centre rule (§9) with a sorted-crossings scanline, and blends with Pillow's integer operator. Writers SHOULD use `supersample: 4` (Session 10's `SceneBuilder` default). Two costs found while benchmarking, left for Session 12/16: (1) a cold process's first `render()` composites the bottom static run onto a transparent canvas and caches it (~10–18 ms at 2210 × 1848; the prototype started from the base image); (2) text slots will carry the subtitle (the benchmark swaps in a `TextSlot` with pixels from the prototype's Pillow code until Session 09).
+- Before starting Session 16: the release benchmark is `report-20261009T205609Z/` (installed wheel). Profile from the latest `package-qpf-*`/`package-grid-*` results. There is no CI (removed by user decision 2026-10-08); checks are run locally. `resources/` is gitignored (user decision 2026-10-08) and is never committed.
 
 ## How to execute and update a session
 
-1. Read this handoff, the requested session, its prerequisites, and the relevant README sections. Implement one numbered session per request unless the user explicitly requests more.
+1. Read this handoff, the requested session, its prerequisites, and the relevant `docs/design.md` sections. Implement one numbered session per request unless the user explicitly requests more.
 2. Before implementation, change that session's index status to `in_progress`, update the active session above, and check that its prerequisites are `completed`. Have at most one active session.
 3. Work through its checkboxes. Check a box only when its deliverable or behavior exists and its relevant verification passes. Add meaningful tests alongside implementation; later integration sessions do not postpone earlier testing.
-4. Run the session's verification. Record the exact commands and outcomes, including visual artifacts, measurements, or environment prerequisites where relevant. A skipped or failed required check does not count as passing.
+4. Run the session's verification. Record the exact commands and outcomes, including visual artifacts, measurements, or environment prerequisites where relevant. A skipped or failed required check does not count as passing. Once Session 07b is complete, a session that records timings writes them in the report's common results schema, regenerates the benchmark report, inspects the figures, and links them in its log entry.
 5. At every session handoff, including partial or blocked work, update this file: checkboxes, index status, current handoff, and a new completion-log entry. Record decisions, deviations, and the next concrete action. Record configured commands in [Development commands](#development-commands) below (this file is version-controlled; `CLAUDE.md` is gitignored and only points here), and update the repository-state bullets in `CLAUDE.md` if they become stale.
 6. Mark the session `completed` only after every completion checkbox and required verification passes. If unfinished, keep it `in_progress`, or use `blocked` with a specific blocker and recovery action. Point the next session to unfinished work until it is resolved.
 7. If a session proves too large, split its remaining work into a new session with explicit prerequisites; preserve existing IDs and completed records. Do not silently drop acceptance criteria.
@@ -37,25 +39,28 @@ Reusable request:
 | [01](#session-01) | Standalone benchmark baseline | 00 | completed |
 | [01b](#session-01b) | QPF workload baseline | 01 | completed |
 | [02](#session-02) | File-based prototype benchmark and feasibility results | 01b | completed |
-| [03](#session-03) | Python package, tooling, and initial CI | 02 | completed |
+| [03](#session-03) | Python package, tooling, and initial CI (CI later removed) | 02 | completed |
 | [04](#session-04) | `.cstack` format specification v1 | 03 | completed |
-| [05](#session-05) | Core reader/writer and layer model | 04 | planned |
-| [06](#session-06) | Compositor, cropped placement, and PNG output | 05 | planned |
-| [07](#session-07) | Layer editing API | 06 | planned |
-| [08](#session-08) | Grid slots: values to pixels with NumPy | 07 | planned |
-| [08b](#session-08b) | Polygon slots: classified polygons to pixels with NumPy/Pillow | 08 | planned |
-| [09](#session-09) | Text slots with Pillow | 08b | planned |
-| [10](#session-10) | Build-side authoring from Matplotlib/Cartopy | 09 | planned |
-| [11](#session-11) | Colorbars and legends | 10 | planned |
-| [12](#session-12) | Lazy loading and layer storage performance | 11 | planned |
-| [13](#session-13) | Core-only runtime and source-independence verification | 12 | planned |
-| [14](#session-14) | End-to-end examples and public API documentation | 13 | planned |
-| [15](#session-15) | Distribution validation and v0.1 readiness | 14 | planned |
+| [05](#session-05) | Core reader/writer and layer model | 04 | completed |
+| [06](#session-06) | Compositor, cropped placement, and PNG output | 05 | completed |
+| [07](#session-07) | Layer editing API | 06 | completed |
+| [07b](#session-07b) | Benchmark report and comparison figures | 07 | completed |
+| [08b](#session-08b) | Polygon slots: classified polygons to pixels with NumPy/Pillow | 07b | completed |
+| [08](#session-08) | Grid slots: values to pixels with NumPy | 07b | completed |
+| [09](#session-09) | Text slots with Pillow | 08, 08b | completed |
+| [10](#session-10) | Build-side authoring from Matplotlib/Cartopy | 09 | completed |
+| [11](#session-11) | Colorbars and legends | 10 | completed |
+| [12](#session-12) | Archive lifecycle and storage defaults (lazy decoding only if measured) | 11 | completed |
+| [13](#session-13) | Core-only runtime and source-independence verification | 12 | completed |
+| [14](#session-14) | End-to-end examples and public API documentation | 13 | completed |
+| [15](#session-15) | Distribution validation and v0.1 readiness | 14 | completed |
 | [16](#session-16) | Workload profiling and next extension decision | 15 | planned |
 
 Milestones:
 
 - **After 02:** measured proof that a file-based, core-only runtime beats a full Cartopy render by enough to justify the package.
+- **After 07b:** speed and accuracy figures comparing the standard Matplotlib/Cartopy render with CartoStack, regenerated by every later session that records timings.
+- **After 08b:** the primary workload (QPF loop) runs on the package itself, benchmarked against the Cartopy baseline and the Session 02 prototype.
 - **After 09:** working core runtime: load a hand-built `.cstack`, replace grid values, classified polygons, and text, add a layer, composite, and write PNG using only NumPy and Pillow.
 - **After 11:** build-to-runtime round trip: a file authored from Matplotlib/Cartopy renders, after updates, to match a full Cartopy render of the same inputs.
 - **After 13:** portability verified in fresh environments without source data or rendering libraries.
@@ -63,20 +68,21 @@ Milestones:
 
 ## Target v0.1 package
 
-Sessions 03–15 produce one installable `cartostack` package. Method names are placeholders until Sessions 04 (format) and 07 (editing API) fix them.
+Sessions 03–15 produce one installable `cartostack` package. The editing and output names on `Scene` were settled in Session 07; `replace_polygons(id, records, values)` (08b), `replace_grid(id, values, *, vmin=None, vmax=None, lut=None)` (08), `scene.text[id] = value` / `replace_text(id, value)` (09) and `SceneBuilder` (10) are settled, as are `add_colorbar` / `redraw_colorbar` (Session 11).
 
 ```python
-# Build machine: pip install cartostack[build]  (Matplotlib + Cartopy)
+# Build machine: pip install cartostack[build]  (Matplotlib >= 3.11 + Cartopy); settled in Session 10
 from cartostack.build import SceneBuilder
 
-builder = SceneBuilder(geometry)
-builder.add_static("land_ocean", draw=draw_land_ocean, order=10)
-builder.add_grid_slot("temperature", lon=lon, lat=lat, order=20, cmap="coolwarm", vmin=-30, vmax=40)
-builder.add_polygon_slot("qpf", bins=qpf_bins, order=25)   # classified polygons, e.g. WPC QPF
-builder.add_static("borders", draw=draw_borders, order=30)
-builder.add_colorbar("cbar", grid="temperature", order=95)
-builder.add_text_slot("title", text="", position=..., font="DejaVuSans.ttf", size=16, order=90)
-builder.save("northeast.cstack")
+b = SceneBuilder.new(projection, extent, width=1200, height=800, dpi=100, axes=(0.02, 0.13, 0.96, 0.78))
+# or wrap an existing figure: SceneBuilder(fig, ax, dpi=300, crop="tight")
+b.add_static("below", order=0, background=True, draw=draw_land_ocean)      # or zorder=(lo, hi), artists=[...]
+b.add_grid_slot("temperature", order=20, lon=lon, lat=lat, cmap="coolwarm", vmin=-30, vmax=40, alpha=0.8)
+b.add_polygon_slot("qpf", order=25, bins=qpf_bins, fallback=("gray", 10), round_decimals=2)  # supersample=4
+b.add_static("above", order=30, draw=draw_borders)
+b.add_text_slot("title", title_artist, order=90)                           # or x=, y=, s=, fontsize=, ...
+b.save("northeast.cstack")                                                  # build(rest=...) sweeps leftovers
+b.add_colorbar("cbar", cbar, slot="temperature", order=95)                # redrawn at runtime on a new norm/LUT
 
 # Runtime worker: pip install cartostack  (NumPy + Pillow only)
 from cartostack import Scene
@@ -85,8 +91,16 @@ with Scene.load("northeast.cstack") as scene:
     scene.replace_grid("temperature", t2m)
     scene.replace_polygons("qpf", rings, values)   # lon/lat rings, one value per polygon
     scene.text["title"] = "2-m Temperature"
-    scene.add_layer("logo", logo_rgba, order=93, x=1100, y=740)
-    scene.save_png("t2m.png")
+    scene.add_layer("logo", logo_rgba, order=93, left=1100, top=740)
+    scene.save_png("t2m.png")                      # mode="RGBA"|"RGB", compress_level=0..9
+
+# Settled in Session 07 (layers are immutable; each edit swaps in a validated new layer object):
+scene.replace_layer("above", rgba)                 # or scene["above"] = rgba / a Layer with that id
+scene.add_layer(layer)                             # or add_layer(id, rgba, order=..., left=, top=, ...)
+scene.remove_layer("logo")                         # or del scene["logo"]
+scene.update_layer("cbar", order=96, left=10, top=700, opacity=0.8, visible=True)
+scene.hide("counties"); scene.show("counties")
+rgba = scene.render()                              # (height, width, 4) uint8
 ```
 
 Guarantees checked by tests: the runtime path imports neither Matplotlib nor Cartopy (checked through `sys.modules` in a fresh process), opens no source geospatial files, decodes no layer it does not need, and produces output matching a full Cartopy render of the same inputs within documented tolerances. Polygon slots project lon/lat with a NumPy implementation of the stored projection (Lambert Conformal Conic first; decided 2026-10-08), so the runtime needs no pyproj. Ad hoc runtime overlays (stations, warning outlines) outside declared slots remain a post-v0.1 extension. A file may declare any number of data slots of either kind, including just one.
@@ -95,11 +109,11 @@ Guarantees checked by tests: the runtime path imports neither Matplotlib nor Car
 
 Recorded so sessions do not re-derive it; re-check before relying on it.
 
-- Machine: Apple M3 Pro, macOS (Darwin 25.6). Git remote `origin` is GitHub (`dvanhoesen/GeoScene`, repository name unchanged), so Session 03 CI targets GitHub Actions.
+- Machine: Apple M3 Pro, macOS (Darwin 25.6). Git remote `origin` is GitHub (`dvanhoesen/CartoStack`). No CI: GitHub Actions was removed on 2026-10-08 by user decision.
 - `uv`: installed 2026-10-08 — `uv 0.12.23 (Homebrew 2026-10-03 aarch64-apple-darwin)` at `/opt/homebrew/bin/uv`.
 - Existing interpreters: Anaconda Python 3.11.8 (`cartopy 0.25.0`, `matplotlib 3.10.6`, `numpy 2.3.0`, `Pillow 11.3.0`, `pyproj 3.6.1`, `shapely 2.1.1`, `pytest 7.4.0`, `mypy 1.8.0`) and Homebrew Python 3.13. Use uv-managed environments, not the Anaconda base environment, for recorded results.
 - Cartopy Natural Earth cache (`~/.local/share/cartopy/shapefiles/natural_earth/`): 10m/50m/110m land, ocean, lakes, coastline, rivers, `admin_1_states_provinces_lakes`, `admin_0_boundary_lines_land`. **Missing:** `ne_10m_populated_places` (city labels).
-- County fixture (added by the user 2026-10-08): `resources/NYS_Shoreline_Counties/` — "NYS County Boundaries – Shoreline Version" (NYS ITS GIS Program Office, published January 2024; counties clipped to major shorelines). Polygon shapefile, 62 records, WGS 84 geographic (`.prj`), UTF-8 (`.cpg`), bbox `[-79.762, 40.4961, -71.8561, 45.0129]`, 306,418 vertices (high detail, a realistic stress case). Fields include `NAME`, `ABBREV`, `FIPS_CODE`, `POP2020`. The base name contains a space (`NYS Counties.*`); quote paths. QGIS metadata is in `NYS Counties.qmd`. Licence/redistribution terms not yet recorded; decide whether `resources/` is committed or gitignored before Session 01 commits anything. SHA-256:
+- County fixture (added by the user 2026-10-08): `resources/NYS_Shoreline_Counties/` — "NYS County Boundaries – Shoreline Version" (NYS ITS GIS Program Office, published January 2024; counties clipped to major shorelines). Polygon shapefile, 62 records, WGS 84 geographic (`.prj`), UTF-8 (`.cpg`), bbox `[-79.762, 40.4961, -71.8561, 45.0129]`, 306,418 vertices (high detail, a realistic stress case). Fields include `NAME`, `ABBREV`, `FIPS_CODE`, `POP2020`. The base name contains a space (`NYS Counties.*`); quote paths. QGIS metadata is in `NYS Counties.qmd`. Licence/redistribution terms not yet recorded. `resources/` is gitignored and must not be committed (user decision 2026-10-08). SHA-256:
   - `NYS Counties.shp` `c3fdde4d0c7f6ef3194f6e92940ff82b93c219393e28f25c4b4cdf7c8ae2ed24` (4,908,948 B)
   - `NYS Counties.shx` `41d740903605db3223085e6ea0844e301f0f81ff2878acc3d90c8802ddf1e362`
   - `NYS Counties.dbf` `f5bdbc93a2f0f64f889cae66e31634b12067dcb5cc41949566cedadd016952b8`
@@ -267,11 +281,11 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `cartostack/io.py` (or `serialization/`), raster layer model, `Scene.load()` (eager), `Scene.save()`, and round-trip tests.
 
-- [ ] Implement layer objects for the v1 kinds with owned `uint8` RGBA buffers; snapshot caller arrays so later mutation cannot alter a layer.
-- [ ] Validate dtype, shape, placement, and geometry compatibility on creation and load.
-- [ ] Implement eager load and save for each supported layer encoding, writing atomically (temporary file then rename) so a failed save never corrupts an existing file.
-- [ ] Return actionable errors for missing members, checksum mismatches, unsupported versions, and corrupt data.
-- [ ] Test save → load → save byte-stable manifests and pixel-identical layers.
+- [x] Implement layer objects for the v1 kinds with owned `uint8` RGBA buffers; snapshot caller arrays so later mutation cannot alter a layer.
+- [x] Validate dtype, shape, placement, and geometry compatibility on creation and load.
+- [x] Implement eager load and save for each supported layer encoding, writing atomically (temporary file then rename) so a failed save never corrupts an existing file.
+- [x] Return actionable errors for missing members, checksum mismatches, unsupported versions, and corrupt data.
+- [x] Test save → load → save byte-stable manifests and pixel-identical layers.
 
 **Verification:** Round-trip tests, corrupted/invalid-file tests, and a check that load and save run with only core dependencies installed.
 
@@ -281,11 +295,11 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `cartostack/compositor.py`, cropped-layer placement, `Scene.render()` returning RGBA, and `Scene.save_png()`.
 
-- [ ] Implement source-over composition in the documented straight-alpha convention (Pillow `alpha_composite` as the reference), honouring order, visibility, and uniform opacity.
-- [ ] Place cropped layers at integer offsets, including layers partially outside the canvas; keep map clipping distinct from canvas placement clipping.
-- [ ] Flatten contiguous runs of unchanged layers and reuse them across renders; verify output equals per-layer composition.
-- [ ] Encode PNG (RGB or RGBA, configurable `compress_level`) without changing canvas dimensions.
-- [ ] Test transparent/partial-alpha/overlapping fixtures against independently computed expected pixels, and cropped versus full-canvas equivalence.
+- [x] Implement source-over composition in the documented straight-alpha convention (Pillow `alpha_composite` as the reference), honouring order, visibility, and uniform opacity.
+- [x] Place cropped layers at integer offsets, including layers partially outside the canvas; keep map clipping distinct from canvas placement clipping.
+- [x] Flatten contiguous runs of unchanged layers and reuse them across renders; verify output equals per-layer composition.
+- [x] Encode PNG (RGB or RGBA, configurable `compress_level`) without changing canvas dimensions.
+- [x] Test transparent/partial-alpha/overlapping fixtures against independently computed expected pixels, and cropped versus full-canvas equivalence.
 
 **Verification:** Exact or explicitly bounded numeric comparisons, PNG decode comparisons, and composite timing for the Session 01 scene.
 
@@ -295,41 +309,61 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Public editing API on `Scene`, error types, and lifecycle tests.
 
-- [ ] Implement `replace_layer`/`scene[id] = rgba`, `add_layer`, `remove_layer`, `visible`, `opacity`, and order changes, validating against the file's geometry.
-- [ ] Make replacements atomic so a failed replacement leaves the previous layer usable.
-- [ ] Ensure edits never decode, modify, or rewrite untouched layers; saving a modified scene to a new path leaves the source file (the template) unchanged.
-- [ ] Reject operations that need information the file does not hold (for example restyling a raster's line width) with a clear error.
-- [ ] Settle public method names and record them in the [target v0.1 package](#target-v01-package) example.
+- [x] Implement `replace_layer`/`scene[id] = rgba`, `add_layer`, `remove_layer`, `visible`, `opacity`, and order changes, validating against the file's geometry.
+- [x] Make replacements atomic so a failed replacement leaves the previous layer usable.
+- [x] Ensure edits never decode, modify, or rewrite untouched layers; saving a modified scene to a new path leaves the source file (the template) unchanged.
+- [x] Reject operations that need information the file does not hold (for example restyling a raster's line width) with a clear error.
+- [x] Settle public method names and record them in the [target v0.1 package](#target-v01-package) example.
 
 **Verification:** Lifecycle tests with decode/encode spies, atomic-failure tests, and template-immutability tests.
 
-### Session 08
+### Session 07b
 
-**Goal:** Render new values for a grid slot with NumPy only.
+**Goal:** Show, as figures, how CartoStack's speed and accuracy compare with the standard Matplotlib/Cartopy render, and keep those figures current as the package grows.
 
-**Deliverables:** Grid slot implementation, `replace_grid()`, colormap LUT handling, and correctness tests.
+**Deliverables:** `benchmarks/report.py` (PEP 723 with lockfile; Matplotlib is allowed here because it is a benchmark, never on the runtime path), a common timing-results schema with adapters for the existing results files, and a generated report directory `benchmarks/results/report-<stamp>/` (figures as PNG, `report.json` recording every input file and value plotted, and a short `index.md` listing the figures).
 
-- [ ] Render values via index-map gather → normalize → LUT → layer alpha, with NaN/masked values and out-of-range values following the slot's documented rules.
-- [ ] Validate value shape and dtype against the slot; raise a grid-mismatch error otherwise.
-- [ ] Allow changing `vmin`/`vmax` and colormap at runtime (LUT regenerated from a stored colormap definition or supplied by the caller) and mark dependent colorbars stale for Session 11.
-- [ ] Test against analytic fixtures with hand-computed expected pixels, including masks and domain edges.
-- [ ] Compare against the Session 02 `pcolormesh` reference and record the difference (expected: equal away from anti-aliased domain edges).
+- [x] Define the common schema: series (`cartopy-baseline`, `prototype`, `package`), workload (`qpf`, `grid`), mode (`cold-process`, `warm`, `loop`), per-product records, and per-phase seconds (interpreter, imports, load/decode, data render, static content, text, compositing, PNG encode, other). Write adapters for the Session 01, 01b, 02 and 06 results; later benchmarks write the schema directly.
+- [x] Select inputs explicitly (paths) or as the latest result of each kind, and record the chosen paths in `report.json` and in each figure's footer.
+- [x] Figure: per-phase stacked bars for one cold product, Cartopy versus CartoStack, for QPF and grid (log or broken axis so CartoStack's phases stay readable).
+- [x] Figure: cumulative wall time over the 18-product QPF loop, one line per series (shows Cartopy's first-product cost against CartoStack's flat per-product cost).
+- [x] Figure: per-product time against polygon count, data-render phase and total, per series.
+- [x] Figure: speed-up against accuracy (share of pixels differing by more than 8 and by more than 32 levels) for each Session 02 configuration (1×/2×/4× supersampling, Agg-exact stacking, split static layers).
+- [x] Figure: speed-up summary with cold, warm and loop speed-ups shown separately, never as one headline number; show medians with min–max ranges.
+- [x] Follow the `dataviz` skill for chart form and colours; one consistent colour per series across all figures.
 
-**Verification:** Analytic and masked-grid tests, reference comparison, and timing of the grid render for 500 × 500 and 1799 × 1059 (HRRR-sized) grids.
+**Verification:** Run the report on the current results; check that every plotted number equals the value recorded in the Session 01b, 02 and 06 completion-log entries; inspect each figure visually; `uvx ruff check --line-length 120 benchmarks/` passes.
 
 ### Session 08b
 
 **Goal:** Render new classified polygons (e.g. WPC QPF) with NumPy and Pillow only.
 
-**Deliverables:** `cartostack/projection.py` (NumPy LCC forward), polygon slot implementation, `replace_polygons()`, and tests.
+**Deliverables:** `cartostack/projection.py` (NumPy LCC forward), polygon slot implementation, `replace_polygons()`, tests, and a package-based QPF benchmark (`benchmarks/package_qpf.py`, project environment) writing the 07b schema.
 
-- [ ] Implement ellipsoidal Lambert Conformal Conic forward projection in NumPy; test against pyproj to ≤ 1 mm in the `build`-extra job.
-- [ ] Map projected rings to pixels via the stored affine transform; fill in draw order with holes into a bin-index image; clip to the map area; colour via the bin LUT.
-- [ ] Accept rings plus one value per polygon (and a helper for shapely/GeoJSON-like input without importing shapely); validate inputs and reject values with no bin unless an out-of-range colour is defined.
-- [ ] Choose the default edge treatment (none vs supersampling) from Session 02 measurements; quantify differences against Cartopy renders of the same polygons.
-- [ ] Test analytic polygons (squares, holes, overlaps, polygons crossing the map edge) with hand-computed expected pixels.
+- [x] Implement ellipsoidal Lambert Conformal Conic forward projection in NumPy; test against pyproj to ≤ 1 mm in the `build`-extra environment.
+- [x] Map projected rings to pixels via the stored affine transform; fill in draw order with holes into a bin-index image; clip to the map area; colour via the bin LUT.
+- [x] Accept rings plus one value per polygon (and a helper for shapely/GeoJSON-like input without importing shapely); validate inputs and reject values with no bin unless an out-of-range colour is defined.
+- [x] Choose the default edge treatment (none vs supersampling) from Session 02 measurements; quantify differences against Cartopy renders of the same polygons.
+- [x] Test analytic polygons (squares, holes, overlaps, polygons crossing the map edge) with hand-computed expected pixels.
+- [x] Benchmark the package on the QPF workload (cold single product and the 18-product loop, scenes built from the Session 02 prototype layers as in `compositor_timing.py`; subtitle as a pre-rendered raster until Session 09) and compare with both the Cartopy baseline and the Session 02 prototype. Investigate any per-product regression of more than 10 % against the prototype before completing.
+- [x] Regenerate the 07b report with the `package` series.
 
-**Verification:** Projection accuracy tests, analytic rasterization tests, QPF comparison against the Session 01b baseline, and per-product timing at 2210 × 1848.
+**Verification:** Projection accuracy tests, analytic rasterization tests, QPF comparison against the Session 01b baseline, per-product timing at 2210 × 1848, and the regenerated report figures.
+
+### Session 08
+
+**Goal:** Render new values for a grid slot with NumPy only.
+
+**Deliverables:** Grid slot implementation, `replace_grid()`, colormap LUT handling, correctness tests, and a package grid benchmark writing the 07b schema.
+
+- [x] Render values via index-map gather → normalize → LUT → layer alpha, with NaN/masked values and out-of-range values following the slot's documented rules.
+- [x] Validate value shape and dtype against the slot; raise a grid-mismatch error otherwise.
+- [x] Allow changing `vmin`/`vmax` and colormap at runtime (LUT regenerated from a stored colormap definition or supplied by the caller) and mark dependent colorbars stale for Session 11.
+- [x] Test against analytic fixtures with hand-computed expected pixels, including masks and domain edges.
+- [x] Compare against the Session 02 `pcolormesh` reference and record the difference (expected: equal away from anti-aliased domain edges).
+- [x] Regenerate the 07b report with the package grid series.
+
+**Verification:** Analytic and masked-grid tests, reference comparison, timing of the grid render for 500 × 500 and 1799 × 1059 (HRRR-sized) grids, and the regenerated report figures.
 
 ### Session 09
 
@@ -337,13 +371,14 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Text slot implementation, `scene.text[...]`, embedded-font handling, and text tests.
 
-- [ ] Render text with Pillow/FreeType from the embedded font at the stored size, color, anchor, and alignment; place it as a cropped layer.
-- [ ] Replace one text slot without touching other layers or moving any geometry.
-- [ ] Error clearly when a text slot has no usable font; never fall back silently to a different font.
-- [ ] Compare Pillow output with Matplotlib text for the same font/size/anchor; document the offset/weight differences and adjust anchor conversion to minimize them.
-- [ ] Verify the core-runtime milestone: a hand-built `.cstack` loads, takes new grid values, new polygons, new text, and an added layer, and writes PNG with only NumPy and Pillow installed.
+- [x] Render text with Pillow/FreeType from the embedded font at the stored size, color, anchor, and alignment; place it as a cropped layer.
+- [x] Replace one text slot without touching other layers or moving any geometry.
+- [x] Error clearly when a text slot has no usable font; never fall back silently to a different font.
+- [x] Compare Pillow output with Matplotlib text for the same font/size/anchor; document the offset/weight differences and adjust anchor conversion to minimize them.
+- [x] Verify the core-runtime milestone: a hand-built `.cstack` loads, takes new grid values, new polygons, new text, and an added layer, and writes PNG with only NumPy and Pillow installed.
+- [x] Switch the package QPF benchmark's subtitle to the text slot and regenerate the 07b report, so the QPF figures show the complete per-product runtime.
 
-**Verification:** Text placement tests, Matplotlib comparison images (in the `build`-extra job), and the core-only milestone test in CI.
+**Verification:** Text placement tests, Matplotlib comparison images (in the `build`-extra environment), the core-only milestone test run locally in a core-only environment (`uv sync --group dev`), and the regenerated report figures.
 
 ### Session 10
 
@@ -351,15 +386,15 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** `cartostack.build.SceneBuilder`, fixed-geometry figure construction, static-layer capture, index-map generation, georeferencing export, and an authored example file.
 
-- [ ] Build figures from the canvas geometry with transparent backgrounds and fixed axes placement; resolve Cartopy's aspect adjustment once and record the resolved axes rectangle in the file.
-- [ ] Capture static layers via user draw callbacks into owned RGBA buffers, avoiding duplicated frames/backgrounds across layers; release figures afterwards.
-- [ ] Author polygon slots from a bin table (as in the QPF example) and resolve a `bbox_inches="tight"` output crop once at build time.
-- [ ] Generate grid-slot index maps with the index-image method from caller-supplied lon/lat (centers or edges, documented).
-- [ ] Capture text-slot definitions (font file, size, color, anchor) from the intended style and embed the font.
-- [ ] Export the CRS and affine pixel transform; test that control-point lon/lat positions map to the same pixels via the stored transform (using pyproj in the test) as Cartopy draws them.
-- [ ] Compare a freshly authored and updated file's output with a full Cartopy render of the same inputs.
+- [x] Build figures from the canvas geometry with transparent backgrounds and fixed axes placement; resolve Cartopy's aspect adjustment once and record the resolved axes rectangle in the file.
+- [x] Capture static layers via user draw callbacks into owned RGBA buffers, avoiding duplicated frames/backgrounds across layers; release figures afterwards.
+- [x] Author polygon slots from a bin table (as in the QPF example), defaulting to `supersample: 4` (Session 08b measurements, `docs/format.md` §9), and resolve a `bbox_inches="tight"` output crop once at build time.
+- [x] Generate grid-slot index maps with the index-image method from caller-supplied lon/lat (centers or edges, documented).
+- [x] Capture text-slot definitions (font file, size, color, anchor) from the intended style and embed the font; for Matplotlib ≥ 3.11 use `snap: null` and `offset: [0, 0]` (Session 09).
+- [x] Export the CRS and affine pixel transform; test that control-point lon/lat positions map to the same pixels via the stored transform (using pyproj in the test) as Cartopy draws them.
+- [x] Compare a freshly authored and updated file's output with a full Cartopy render of the same inputs.
 
-**Verification:** Authoring tests in the `build`-extra job, control-point alignment tests, and authored-versus-baseline image comparison.
+**Verification:** Authoring tests in the `build`-extra environment, control-point alignment tests, and authored-versus-baseline image comparison.
 
 ### Session 11
 
@@ -367,39 +402,41 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Colorbar layer kind, its dependency on a grid slot, and tests.
 
-- [ ] Author colorbars at build time; store the colorbar's geometry (gradient box, tick positions, label text/font) so the runtime can redraw it with NumPy/Pillow.
-- [ ] Reuse the stored colorbar when only values change; redraw it when `vmin`/`vmax` or the colormap change.
-- [ ] Support a static legend image (raster layer) for non-grid content.
-- [ ] Verify the build-to-runtime milestone: authored file → updated data, normalization, and title → output matches a full Cartopy render within documented tolerances.
+- [x] Author colorbars at build time; store the colorbar's geometry (gradient box, tick positions, label text/font) so the runtime can redraw it with NumPy/Pillow.
+- [x] Reuse the stored colorbar when only values change; redraw it when `vmin`/`vmax` or the colormap change.
+- [x] Support a static legend image (raster layer) for non-grid content.
+- [x] Verify the build-to-runtime milestone: authored file → updated data, normalization, and title → output matches a full Cartopy render within documented tolerances.
 
 **Verification:** Fixed/changed-normalization tests, colorbar comparison against Matplotlib's colorbar, and the end-to-end milestone comparison.
 
 ### Session 12
 
-**Goal:** Make loading fast by decoding only what is needed.
+**Goal:** Settle archive lifetime and the storage defaults chosen in Session 02; add lazy decoding only if measurements show it pays.
 
-**Deliverables:** Lazy loading, `Scene.close()`/context-manager support, and the encoding/flattening defaults chosen in Session 02.
+**Deliverables:** `Scene.close()`/context-manager semantics, pre-flattened static runs in the file, cached encoded bytes for unchanged layers at save, and a measured lazy-decoding decision.
 
-- [ ] Load the manifest without decoding layers; decode on first use and reuse the buffer afterwards.
-- [ ] Replace a lazily loaded layer without decoding its previous pixels.
-- [ ] Optionally store pre-flattened static runs in the file and use them when the layers in a run are unchanged.
-- [ ] Define archive lifetime and close behavior; error clearly when a closed scene needs undecoded data.
-- [ ] Test lazy/eager output equivalence and saving scenes that mix replaced and never-decoded layers.
+Scope reduced in the 2026-10-09 plan revision: Session 06 measured a full load of the 2210 × 1848 QPF file at 12 ms (about 4 % of a cold product), so lazy decoding is not assumed to be worth its complexity.
 
-**Verification:** Decoder-call instrumentation, exact lazy/eager comparisons, lifecycle tests, and cold-process load timings versus Session 02.
+- [x] Define archive lifetime and close behavior; document it in `docs/format.md`/the API docs and test it.
+- [x] Optionally store pre-flattened static runs in the file and use them when the layers in a run are unchanged.
+- [x] Reuse a layer's encoded bytes at save until its pixels change (deferred from Session 07: an edited layer's pixels are re-encoded at every save until the scene is reloaded).
+- [x] Measure load plus decode as a share of cold-product time from the 07b report for QPF and grid. If it exceeds 10 % for either workload, implement lazy decoding (manifest first, decode on first use, replace without decoding the previous pixels, error clearly when a closed scene needs undecoded data, lazy/eager equivalence tests). Otherwise record a no-change decision with the numbers and leave lazy decoding in the backlog.
+- [x] Regenerate the 07b report.
+
+**Verification:** Lifecycle tests, encode-call instrumentation for repeated saves, cold-process load timings versus Session 02 and the measured lazy-decoding decision (plus decoder-call instrumentation and exact lazy/eager comparisons if lazy decoding is implemented).
 
 ### Session 13
 
 **Goal:** Verify portability and dependency boundaries independently of the build environment.
 
-**Deliverables:** Source-independence and fresh-environment tests in CI.
+**Deliverables:** Source-independence tests and a documented manual fresh-environment check procedure (`CONTRIBUTING.md` → "Environment checks"), with recorded results.
 
-- [ ] Author and save a file, remove the source fixtures and Natural Earth cache, then load, update, and render it in a fresh process.
-- [ ] In an environment with only core dependencies, verify load, grid, polygon, and text replacement (no pyproj or shapely installed), layer addition, compositing, save, and PNG output, and assert Matplotlib/Cartopy are absent from `sys.modules`.
-- [ ] Disable network access during runtime tests and verify no downloads or source lookups are attempted.
-- [ ] Confirm lazy and eager loading meet the same guarantees.
+- [x] Author and save a file, remove the source fixtures and Natural Earth cache, then load, update, and render it in a fresh process.
+- [x] In an environment with only core dependencies, verify load, grid, polygon, and text replacement (no pyproj or shapely installed), layer addition, compositing, save, and PNG output, and assert Matplotlib/Cartopy are absent from `sys.modules`.
+- [x] Disable network access during runtime tests and verify no downloads or source lookups are attempted.
+- [x] ~~If Session 12 implemented lazy decoding, confirm lazy and eager loading meet the same guarantees.~~ Not applicable: Session 12 measured load at ≤ 5.6 % of a cold product and kept eager loading. Check instead that loaded scenes keep no file open (`tests/test_lifecycle.py`).
 
-**Verification:** Fresh-environment, fresh-process CI jobs; image comparisons; explicitly removed sources and blocked network.
+**Verification:** Manual fresh-environment, fresh-process checks (the procedure in `CONTRIBUTING.md`); image comparisons; explicitly removed sources and blocked network.
 
 ### Session 14
 
@@ -407,10 +444,10 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Authoring and runtime examples, API and format documentation, and updated repository instructions.
 
-- [ ] Add executable examples: author the reference scenes, then cron-style runtime scripts that update grid and text, and QPF polygons and subtitle for all products in one process, and write PNGs.
-- [ ] Document installation (core vs `build` extra), embedded fonts, archive lifecycle, the format reference, and limitations.
-- [ ] Separate the README quickstart and supported features from the longer design roadmap without losing the architectural reference.
-- [ ] Document focused test/benchmark commands and reconcile `CLAUDE.md` with the implemented repository.
+- [x] Add executable examples: author the reference scenes, then cron-style runtime scripts that update grid and text, and QPF polygons and subtitle for all products in one process, and write PNGs.
+- [x] Document installation (core vs `build` extra), embedded fonts, archive lifecycle, the format reference, and limitations.
+- [x] Separate the README quickstart and supported features from the longer design roadmap without losing the architectural reference.
+- [x] Document focused test/benchmark commands and reconcile `CLAUDE.md` with the implemented repository.
 
 **Verification:** Run examples from an installed package with prepared fixtures, including runtime use in a core-only environment.
 
@@ -420,12 +457,12 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Wheel/sdist validation, supported-environment checks, benchmark summary, and a release-readiness record.
 
-- [ ] Build wheel and sdist; inspect metadata, extras, and included assets.
-- [ ] Install the artifacts into fresh environments and verify imports/examples outside the repository source directory.
-- [ ] Run core-only and `build`-extra tests across the declared Python range, with small cross-platform smoke tests where available.
-- [ ] Re-run the Session 02 benchmark against the package and record the results alongside the baseline.
-- [ ] Check distribution-name availability and document remaining release actions; publishing requires a separate user request.
-- [ ] Confirm Sessions 01–14 are completed or resolve their blockers before declaring v0.1 readiness.
+- [x] Build wheel and sdist; inspect metadata, extras, and included assets.
+- [x] Install the artifacts into fresh environments and verify imports/examples outside the repository source directory.
+- [x] Run core-only and `build`-extra tests across the declared Python range, with small cross-platform smoke tests where available.
+- [x] Re-run the package QPF and grid benchmarks (Sessions 08b/08) from the installed wheel, record them alongside the baseline and the Session 02 prototype, and regenerate the 07b report as the release benchmark summary.
+- [x] Check distribution-name availability and document remaining release actions; publishing requires a separate user request.
+- [x] Confirm Sessions 01–14 are completed or resolve their blockers before declaring v0.1 readiness.
 
 **Verification:** Full configured checks, fresh artifact installation, runnable example smoke tests, and benchmark evidence. Record unsupported/unverified environments explicitly.
 
@@ -435,8 +472,8 @@ Validate these defaults while implementing the relevant session, and record any 
 
 **Deliverables:** Small/medium/large workload report and explicitly scoped follow-up sessions.
 
-- [ ] Profile cold start, manifest read, layer decode, grid render, text render, compositing, PNG encoding, and peak memory separately for each workload size.
-- [ ] Compare with the equivalent full Cartopy baseline, cold and warm.
+- [ ] Profile cold start, manifest read, layer decode, grid render, polygon render, text render, compositing, PNG encoding, and peak memory separately for each workload size.
+- [ ] Compare with the equivalent full Cartopy baseline, cold and warm, as 07b report figures. Priority candidates from earlier measurements: PNG encoding (~40 % of a QPF product in Session 02) and polygon fill on complex products (up to 321 ms).
 - [ ] Identify the dominant measured cost and the expected benefit of a specific change.
 - [ ] Add the next justified extension as new numbered sessions with deliverables, prerequisites, and verification gates, or record a no-change decision.
 
@@ -456,6 +493,7 @@ Candidates for sessions added after Session 16, not requirements for v0.1:
 | Static border restyling without sources | Compiled vector layers (projected paths) as a new layer kind |
 | Compositing or grid rendering dominates after NumPy/Pillow tuning | Rust/PyO3 kernels behind the same API |
 | Small edits on large canvases | Dirty rectangles or a composite tree |
+| Load and decode become a significant share of a product (Session 12 gate: > 10 %; measured 4.1–5.6 % cold, < 1 % in loops), or files hold many layers a render does not use | Lazy layer decoding (manifest first, decode on first use) |
 | Scene size exceeds practical memory | Tiled layers or an indexed/raw container; do not assume ZIP members can be memory-mapped |
 | CPU paths insufficient for very large workloads | Optional GPU backend with equivalent CPU behavior |
 
@@ -505,13 +543,105 @@ uv run pytest tests/test_package.py::test_import_does_not_load_rendering_librari
 uv run scripts/fetch_fixtures.py [--check]   # prepare fixtures (network) / verify offline
 uv build                                     # sdist + wheel
 uv lock --check                              # uv.lock up to date
-uvx --from actionlint-py actionlint          # lint .github/workflows
 ```
 
 Focused (Session 04):
 
 ```bash
 uv run pytest tests/test_geometry.py tests/test_manifest.py   # format 1.0 validation, examples, schema agreement
+```
+
+Focused (Session 05):
+
+```bash
+uv run pytest tests/test_io.py tests/test_layers.py   # round trips, byte stability, atomic saves, corrupt files, layer ownership
+```
+
+Configured (Session 06, verified 2026-10-08):
+
+```bash
+uv run pytest tests/test_compositor.py                # compositing vs independent references, placement, flattening, PNG
+uv run python benchmarks/compositor_timing.py         # needs a Session 02 prototype build; → results/compositor-<stamp>/; ~10 s
+uv run python benchmarks/compositor_timing.py --reps 5
+```
+
+Focused (Session 07):
+
+```bash
+uv run pytest tests/test_editing.py                   # edits, atomic failures, decode/encode spies, template immutability
+```
+
+Configured (Session 07b, verified 2026-10-09):
+
+```bash
+uv run benchmarks/report.py                       # figures + index.md + report.json from the latest results of each kind → results/report-<stamp>/; ~10 s
+uv run benchmarks/report.py --qpf-baseline benchmarks/results/qpf-<stamp>   # pin an input (also --grid-baseline, --prototype-runtime, --compositor)
+uv run benchmarks/report.py --bench path/to/bench.json --out <dir>         # extra native results; every results/**/bench.json is read anyway
+uv lock --script benchmarks/report.py
+```
+
+Configured (Session 08b, verified 2026-10-09):
+
+```bash
+uv run pytest tests/test_polygons.py tests/test_projection.py   # exact fill vs brute force, hand-computed pixels, LCC (pyproj tests need --extra build)
+uv run python benchmarks/package_qpf.py           # package QPF: 5 cold Day 1-3 runs + 18-product loops at 4x (2 runs), 1x and 2x (1 each); accuracy vs Session 01b; writes bench.json; ~1 min
+uv run python benchmarks/package_qpf.py --supersample 2 --compare 4 --cold-runs 3 --loop-runs 1
+uv run benchmarks/report.py                       # then regenerate the figures
+```
+
+Configured (Session 08, verified 2026-10-09):
+
+```bash
+uv run pytest tests/test_grids.py                 # rows at every boundary, masks, alpha, index map, Scene; Matplotlib-exact tests need --extra build
+uv run python benchmarks/package_grid.py          # package grid: 5 cold variant-0 runs + 2 loops of variants 0-3, accuracy vs pcolormesh, 500x500 and HRRR render timing; writes bench.json; ~15 s
+```
+
+Configured (Session 09, verified 2026-10-09):
+
+```bash
+uv run pytest tests/test_text.py                  # fonts, layout rules, rendering, scene.text, core-runtime milestone; Matplotlib comparisons need --extra build
+uv run pytest tests/test_text.py::test_core_runtime_milestone   # the milestone: run it in the core-only env (uv sync --group dev)
+```
+
+Configured (Session 10, verified 2026-10-09):
+
+```bash
+uv sync --extra build --group dev && uv run pytest tests/test_build.py && uv sync --group dev   # authoring tests (Matplotlib >= 3.11, Cartopy, pyproj)
+uv run benchmarks/author_scenes.py               # author qpf.cstack and grid.cstack from the baseline figures → results/authored-<stamp>/; ~40 s
+uv run python benchmarks/package_qpf.py --scene benchmarks/results/authored-<stamp>/qpf.cstack    # benchmark an authored file
+uv run python benchmarks/package_grid.py --scene benchmarks/results/authored-<stamp>/grid.cstack
+uv lock --script benchmarks/author_scenes.py
+```
+
+Configured (Session 11, verified 2026-10-09):
+
+```bash
+uv run pytest tests/test_colorbars.py             # tick/label ports, redraw parts, Scene behaviour; Matplotlib comparisons need --extra build
+uv sync --extra build --group dev && uv run pytest tests/test_build.py -k milestone && uv sync --group dev   # build-to-runtime milestone
+```
+
+Focused (Session 12):
+
+```bash
+uv run pytest tests/test_lifecycle.py tests/test_compositor.py   # no open files, close(), encode-once saves, cache cleanup, bottom-layer fast path
+```
+
+Focused (Session 13):
+
+```bash
+uv run pytest tests/test_portability.py   # fresh process: no files outside the scene/output/Python, no network; negative control
+uv sync --extra build --group dev && uv run scripts/check_portability.py && uv sync --group dev   # full procedure (CONTRIBUTING.md → "Environment checks")
+```
+
+Examples (Session 14; `examples/README.md`):
+
+```bash
+uv run --extra build python examples/author_grid.py out/grid.cstack --inputs out/grid-inputs   # author (build extra, Natural Earth fixtures)
+uv run examples/author_qpf.py out/qpf.cstack                                                   # author (PEP 723: adds GeoPandas)
+uv run python examples/update_grid.py out/grid.cstack out/grid-inputs/*.npy --out out/png       # runtime only
+uv run python examples/update_qpf.py out/qpf.cstack benchmarks/data/qpf/day_* --out out/png     # runtime only, all 18 products
+uv run pytest tests/test_examples.py                                                           # runtime examples in a fresh process, no build imports
+uv run --extra build mypy --strict examples --ignore-missing-imports                           # examples type-check (not in the configured mypy files)
 ```
 
 The fixture script moved from `benchmarks/fetch_fixtures.py` to `scripts/fetch_fixtures.py` in Session 03; earlier log entries keep the old path.
@@ -815,3 +945,634 @@ Next: session ID and the first concrete action.
   - The member, encoding and LUT-row decoding checks, and the `mimetype` check, are left to the Session 05 reader.
 - **Remaining/blockers:** none for Session 04. CI is still unverified on GitHub until a push. Open user decisions as before.
 - **Next:** Session 05. Implement `cartostack/io.py`: an atomic writer (mimetype first, ZIP_STORED, members table) and an eager reader (version first, digests, encodings), with layer objects owning `uint8` RGBA buffers and round-trip tests.
+
+### 2026-10-08 — Session 05 — completed
+
+- **Work:**
+  - **`src/cartostack/layers.py`:**
+    - Immutable layer classes `RasterLayer`, `ColorbarLayer`, `GridSlot`, `PolygonSlot` and `TextSlot` (frozen, keyword-only dataclasses).
+    - Pixels, index maps and LUTs are copied into owned, read-only, C-contiguous buffers, with dtype, shape and value-range checks (`owned_rgba`, `owned_index_map`, `owned_lut`; errors raise `LayerError`).
+    - Sizes are resolved from pixels or the index map; numbers are normalised to float/int so equal scenes serialise identically.
+    - Unknown manifest fields are kept in `extra`; encoded source bytes are kept for verbatim re-saves.
+  - **`src/cartostack/io.py`:**
+    - Encoders and decoders for `rgba8+zlib`, `rgba8`, `png`, `i32le+zlib` and `i32le`. Corrupt or mis-sized data raises `FormatError` naming the member.
+    - `read_archive` checks, in order: ZIP; `mimetype` first and exact; manifest present and valid JSON; major version, before any member is trusted; ZIP_STORED storage; archive entries ↔ `members` table both ways; size and SHA-256 of every member.
+    - `write_archive` is deterministic (fixed order, timestamps and attributes) and atomic (temp file in the same directory, fsync, `os.replace`, temp removed on any failure).
+  - **`src/cartostack/scene.py`:**
+    - `Scene(geometry, layers, assets=..., provenance=..., extra=...)` validates unique ids, placement against the canvas, text fonts present among assets, colorbar slots being grid layers, and polygon slots having a supported projection.
+    - Read access: `draw_order()`, `[...]`, `in`, `len`, and `assets`.
+    - `Scene.load` loads eagerly, wraps errors with the file path, and keeps unknown fields at the top level, in geometry, in layer records and in their sections. Members that are not layer data (fonts, others) become assets.
+    - `Scene.save(path, encoding=None)` writes generated member names `layers/<id>.<ext>` and `slots/<id>/{index,lut}.<ext>`, reuses unchanged encoded bytes, validates its own manifest with `parse_manifest` before writing, and saves atomically.
+  - **`cartostack/__init__.py`** exports the public names. The NumPy-backed ones (`Scene` and the layer classes) load lazily, so `cartostack.manifest`/`geometry` validation still imports no NumPy.
+  - **Validator fix in `manifest.py`:** duplicate layer ids are now found from the raw ids, so they are reported even when the other layer is otherwise invalid.
+  - `docs/format.md` §2 documents the reference writer's determinism and which unknown fields it preserves.
+  - **Tests:** `tests/helpers.py` (scene and archive-surgery helpers), `tests/test_io.py` (round trips for every kind × 3 pixel encodings × 2 index encodings, byte stability, re-encoding, verbatim reuse, unknown fields, assets and provenance, two atomic-failure cases, 16 error cases, core-only subprocess), and `tests/test_layers.py` (ownership, validation, immutability, scene consistency).
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 9 files) and `uv lock --check` all pass.
+  - `uv run pytest`: **130 passed, 1 skipped** core-only; 131 passed with `--extra build`; 130 passed and 1 skipped on Python 3.12 with the lowest direct dependencies (numpy 2.0.0, Pillow 10.1.0).
+  - Save → load → save is byte-identical, archives and manifests alike, and so is saving the same scene twice.
+  - Loaded layers are pixel-identical in every encoding.
+  - A failed encode during save leaves the existing file byte-identical with no temporary files left, and a failed rename leaves the directory empty.
+  - Every corruption case raises an actionable `FormatError` or `UnsupportedVersionError` naming the file and member: missing file, not a ZIP, missing or wrong `mimetype`, invalid JSON, major version 2 (reported before members), missing or unlisted member, checksum and size mismatch, compressed member, corrupt zlib, wrong decoded size, non-RGBA PNG, out-of-range index map, and invalid manifests (all problems listed).
+  - Load and save in a fresh process import numpy and PIL but not matplotlib, cartopy, pyproj or shapely, and reproduce the same bytes.
+- **Evidence:** the QPF scene at full size (2210 × 1848; the Session 02 below/above layers, polygon slot, subtitle and font), measured on an M3 Pro:
+
+  | Encoding | File size | Save | Load | Load + re-save |
+  | --- | --- | --- | --- | --- |
+  | `rgba8+zlib` | 1.08 MB | 92 ms | 8.2 ms | 11 ms |
+  | `png` | 1.14 MB | 90 ms | 31.7 ms | 34 ms |
+  | `rgba8` | 33.3 MB | 21 ms | 16.5 ms | 39 ms |
+
+  Every re-save was byte-identical.
+- **Bugs found by the tests and fixed:**
+  - An integer `order` serialised as `12` but reloaded as `12.0`, breaking byte stability on the first round trip; numbers are now normalised.
+  - Duplicate ids could be masked by another error in the same layer.
+- **Decisions/deviations:**
+  - Layers are immutable value objects. Editing, replacement and atomicity of edits belong to Session 07 at the `Scene` level.
+  - Width and height of `None` mean "canvas size" in memory; the writer always writes resolved sizes.
+  - Fonts and any other non-layer members are scene `assets`, kept verbatim.
+  - New scenes get `provenance = {"cartostack": <version>}`; loaded provenance is kept as is, with no save timestamps, to stay byte-stable.
+  - Eager loading copies decoded arrays into owned buffers; avoiding that copy belongs to lazy loading in Session 12.
+  - **User decision (2026-10-08):** `resources/` is gitignored and never committed (`.gitignore` line 2).
+- **Remaining/blockers:** none for Session 05. CI has still not run on GitHub; it needs a push, which needs the user's approval.
+- **Next:** Session 06. Write `cartostack/compositor.py`: source-over in draw order honouring visibility, opacity and cropped or offset placement; `Scene.render()` → RGBA; `Scene.save_png()`; tests against independently computed pixels.
+
+### 2026-10-08 — Session 03 follow-up — CI fix
+
+- **Work:** The first GitHub Actions run (run 37812167444, push of `1d76e38` to `dev`) failed in all 8 jobs at "Set up job", before any project code ran. Cause: `.github/workflows/ci.yml` referenced `astral-sh/setup-uv@v10`, but that action publishes only full version tags (`v10.2.0`, ...). The GitHub API returns 404 for `refs/tags/v10` and 200 for `v10.2.0`, `actions/checkout` `v7` and `actions/upload-artifact` `v7`. Pinned `astral-sh/setup-uv@v10.2.0` in all 5 places (one per job definition).
+- **Verification:** `uvx --from actionlint-py actionlint` is clean. Job and step results were read through the public GitHub API (`/actions/runs/37812167444/jobs`). The fix is unverified on GitHub until the next push.
+- **Next:** after the user pushes, confirm that all CI jobs pass, then continue with Session 06.
+
+### 2026-10-08 — CI removed (user decision)
+
+- **Work:** The user decided to drop CI and GitHub Actions entirely. Deleted `.github/workflows/ci.yml` (`git rm -r -f .github`; the forced removal also discarded the uncommitted `setup-uv@v10.2.0` pin from the "CI fix" entry above). Removed CI from the repository state, handoff, environment notes, development commands (`actionlint`), `CONTRIBUTING.md` and `CLAUDE.md`. Sessions 08b, 09, 10 and 13 now verify in local environments; Session 13's deliverable is a documented manual fresh-environment procedure with recorded results. The procedure is in `CONTRIBUTING.md` → "Environment checks". It contains the same commands the CI jobs ran (lint and types; core-only on Python 3.12–3.14; lowest direct dependencies; `build` extra; wheel and sdist), run by hand. Session 03's record above is kept as history.
+- **Verification:** `git status` shows `.github/workflows/ci.yml` staged as deleted, and no `.github/` directory remains. Local checks pass: `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy`, and `uv run pytest` (130 passed, 1 skipped).
+- **Decisions:** No automated remote checks until the user re-enables them. Manual environment checks happen once the package works end to end (Sessions 13 and 15).
+- **Next:** Session 06 (compositor, cropped placement, PNG output).
+
+### 2026-10-08 — Session 06 — completed
+
+- **Work:**
+  - **`src/cartostack/compositor.py`:**
+    - Straight-alpha source-over with Pillow's `Image.alpha_composite`, starting from a transparent canvas in draw order. Hidden layers, layers without pixels (slots not yet rendered) and opacity 0 are skipped. Opacity scales alpha by `floor(alpha · opacity + 0.5)` through a 256-entry table.
+    - `window()` clips a placed array to the canvas (negative offsets, partly off-canvas, larger than the canvas). Map clipping (`geometry.clip`) is not applied here; it stays a slot-rendering rule.
+    - `Compositor` splits the drawn layers into runs of static layers (`raster`, `colorbar`) and slots. It flattens the bottom run onto the canvas, flattens a static run of 2 or more layers above a slot into an image cropped to the run's bounding box, and reuses each one while the run holds the same layer objects (identity; layers are immutable). Slots and single static layers above a slot are composited every render. Only runs used by the latest render stay cached.
+    - `composite()` is plain layer-by-layer stacking; `encode_png(image, mode="RGBA"|"RGB", compress_level=0..9, background=(255, 255, 255))`. RGB first composites over the opaque background, skipped when the image is already opaque.
+  - **`Scene`:** `render(*, flatten=True)` returns a new, writable `(height, width, 4)` uint8 array; `save_png(path, *, mode, compress_level, background, flatten)` writes atomically. The compositor is created lazily, per scene.
+  - **`io.py`:** the temporary-file, fsync and rename logic was factored out of `write_archive` into `atomic_file()`, which `save_png` reuses. Archive bytes are unchanged; the Session 05 atomicity tests still pass.
+  - **`docs/format.md` §6.2:** adds the opacity rounding rule, keeps placement clipping separate from map clipping, documents the reference runtime's flattening tolerance, and states that output has the canvas size, with RGB composited over a background.
+  - **Tests:** `tests/test_compositor.py` (36 tests).
+    - Two independent references: a NumPy re-derivation of Pillow's integer formula (exact) and textbook float Porter-Duff (within 1 level per operation, within 3 over a stack).
+    - Hand-computed pixels, tie ordering, hidden/transparent/zero-opacity/empty layers, and slots without pixels.
+    - Five placement cases where a cropped layer equals the same pixels padded to the full canvas, `window()` itself, and raster pixels kept outside the axes.
+    - Flattening: an `_over` spy shows the second render composites only the slots and single layers; a replaced layer object invalidates only its own run; exact below slots; ≤3 levels above slots; a 200-stack stress test; exact for opaque runs.
+    - `render()` returns independent arrays, and a save → load → render round trip matches.
+    - PNG: RGBA decodes pixel-identical at levels 0/1/6/9, RGB over two backgrounds matches the NumPy reference, an opaque canvas drops alpha, sizes shrink with level, bytes are deterministic, bad options raise with no file left behind, and a failed rename leaves the existing PNG intact.
+    - A fresh-process `load` + `save_png` imports none of matplotlib, cartopy, pyproj or shapely.
+  - **`benchmarks/compositor_timing.py`** (project environment): builds 1.0 scenes from the Session 02 prototype layers (grid, QPF, and QPF with static-above split into 6 layers; subtitle cropped to its ink box), saves them, then times load, render and encoding.
+- **Verification (local, macOS arm64):**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 10 files) and `uv lock --check` all pass.
+  - `uv run pytest`: **166 passed, 1 skipped** core-only; 167 passed with `--extra build` (environment restored to core only afterwards). 166 passed and 1 skipped on Python 3.12 with the lowest direct dependencies (numpy 2.0.0, Pillow 10.1.0; venv in the session scratchpad per `CONTRIBUTING.md`).
+  - `uv run python benchmarks/compositor_timing.py` (20 reps, Python 3.13.4, numpy 2.5.3, Pillow 12.3.0). For every scene, layer-by-layer renders equal the Session 02 prototype's Pillow stacking exactly, and saved PNGs decode identical to `render()` at the canvas size. No forbidden module was loaded.
+  - The QPF output (`qpf.png`) was inspected visually and is correct.
+- **Evidence:** `benchmarks/results/compositor-20261008T181244Z/` (`results.json`, scenes, PNGs). Medians, M3 Pro:
+
+  | Scene | Load | First render | Warm render | Layer by layer | PNG RGBA 6 | RGBA 1 | RGB 6 | RGB 1 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Grid (Session 01), 1200 × 800, 4 layers | 5.7 ms | 4.6 ms | **2.1 ms** | 4.0 ms | 23.0 ms | 13.1 ms | 19.4 ms | 10.8 ms |
+  | QPF, 2210 × 1848, 4 layers | 12.0 ms | 25.3 ms | **15.3 ms** | 22.9 ms | 64.8 ms | 48.6 ms | 54.9 ms | 41.7 ms |
+  | QPF split, 9 layers | 27.4 ms | 44.9 ms | **15.0 ms** | 33.2 ms | 64.3 ms | 49.3 ms | 56.8 ms | 41.8 ms |
+
+  - Warm renders include a copy of the cached bottom run and the copy into the returned array.
+  - Flattening: grid and QPF are exact (their upper runs are single layers). The split QPF's 6-layer upper run differs from layer-by-layer stacking by at most 1 level in 19,120 of 16.3 M values (0.12 %), and flattening makes it as fast as the pre-flattened file.
+  - PNG encoding remains the largest per-product cost (as in Session 02).
+- **Decisions/deviations:**
+  - Exactness: renders equal layer-by-layer Pillow stacking except for multi-layer static runs above a slot, which are bounded by rounding (≤3 levels in stress tests, documented in §6.2). `flatten=False` gives the exact per-layer result.
+  - "Unchanged" means the same layer object. Slots are treated as changing every render and are never flattened.
+  - RGB output composites over white by default (Matplotlib's default figure colour) rather than dropping alpha; `background` overrides it. The default PNG mode is RGBA with `compress_level=6`. Session 02's per-workload choice (QPF RGBA, grid RGB) is a caller argument.
+  - `render()` returns an owned copy (~3 ms at 4 MP), so callers cannot corrupt the cache; `save_png` encodes from the internal image without that copy.
+- **Remaining/blockers:** none for Session 06.
+- **Next:** Session 07. Add the editing API on `Scene` (`replace_layer`/`scene[id] = rgba`, `add_layer`, `remove_layer`, visibility, opacity and order). Each edit swaps in new immutable layer objects so that the compositor's run cache invalidates exactly the edited run.
+
+### 2026-10-08 — Session 07 — completed
+
+- **Work:**
+  - **Editing API on `Scene`** (`src/cartostack/scene.py`). Every edit builds the new layer tuple, validates it against the geometry and the other layers with the same checks as construction (`_problems`), and only then swaps it in (`_commit`). A failed edit therefore leaves the scene, and its compositor cache, as they were.
+    - `replace_layer(id, new)` and `scene[id] = new`: `new` is either a layer object with the same id (any kind, size and placement), or an RGBA array for a raster or colorbar layer. An array keeps every other field and must have the layer's `(height, width)`. Raw pixels for a slot are refused (slots get new data, Sessions 08–09). A mismatched id is refused (rename with remove and add).
+    - `add_layer(layer)` or `add_layer(id, rgba, *, order=None, left=0, top=0, visible=True, opacity=1.0, encoding=...)`: `order` defaults to above every existing layer, and a tie draws after the existing layers.
+    - `remove_layer(id)` and `del scene[id]` return the removed layer. Removing a grid slot that a colorbar uses is refused.
+    - `update_layer(id, **changes)` accepts `order`, `left`, `top`, `visible`, `opacity` and `encoding`. `show(id)` and `hide(id)` are shorthands.
+    - `KeyError` messages list the existing ids. `with Scene.load(...) as scene:` works (no-op today; lazy loading may hold the file open).
+  - **`src/cartostack/layers.py`:**
+    - `evolve(layer, **changes)` re-creates a validated layer. It shares unchanged buffers: arrays created by the layer module are tracked in a weak registry, so they are not copied again. New `pixels` drop only the cached encoded pixel bytes.
+    - `EDITABLE_FIELDS` lists the fields `update_layer` accepts.
+    - Assigning or deleting a layer attribute raises `ImmutableLayerError` (a `FrozenInstanceError`, so an `AttributeError`). `edit_refusal()` builds its message, which names the right `Scene` call. For attributes the file does not store, such as `linewidth` on a raster or `cmap` on a colorbar, it says the layer holds only pixels and must be re-authored or replaced. Slot parameters such as `vmin` and text `value` direct to replacing the whole layer. `update_layer` gives the same explanations.
+  - **README:** the "Adding layers", "Visibility" and "Style changes" snippets and the end-to-end example now use the settled names (`left`/`top`, `hide`, `update_layer`). The [target v0.1 example](#target-v01-package) records the settled API.
+  - **Tests:**
+    - `tests/test_editing.py` (37 tests): replacement by array or layer object, item assignment and deletion, adding and removing, hide/show, and field updates.
+    - Failure cases leave the scene unchanged (layer identity, render and byte-identical re-save): 9 failed replacements, 12 refused updates and 5 refused additions.
+    - Error messages for in-place assignment, and read-only pixels and geometry.
+    - Spies show that remove, hide and update run no compositing, decoding or copying, and that only the edited run re-composites.
+    - Saving an edited scene decodes nothing and encodes only the replaced and added pixels (2 calls, no index or LUT encodes). Untouched members are byte-identical to the template's.
+    - The template is unchanged after edits and a save to a new path; the edited file reloads with the same draw order and pixels, and re-saves byte-identically.
+    - A failed save over the template keeps it, and the edited scene can still be saved afterwards.
+    - An empty scene renders transparent but cannot be saved (`FormatError`, no file).
+    - The context manager is tested.
+    - `tests/test_layers.py`: `evolve` shares owned buffers and still snapshots foreign read-only views.
+- **Verification (local, macOS arm64):**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 10 files) and `uv lock --check` all pass.
+  - `uv run pytest`: **204 passed, 1 skipped** core-only; 205 passed with `--extra build` (environment restored to core only). 204 passed and 1 skipped on Python 3.12.15 with the lowest direct dependencies (numpy 2.0.0, Pillow 10.1.0).
+- **Evidence:** edit costs on the full-size QPF file (`compositor-20261008T181244Z/qpf.cstack`, 2210 × 1848), medians on an M3 Pro:
+
+  | Operation | Time |
+  | --- | --- |
+  | `update_layer(opacity)` | 0.009 ms |
+  | `hide` + `show` | 0.016 ms |
+  | Remove and re-add a layer object | 0.004 ms |
+  | `replace_layer` with a 4 MP RGBA array (the ownership copy) | 0.51 ms |
+  | `save` unedited, or after a metadata edit (all members reused) | 1.5 ms |
+  | `save` after a pixel replacement (re-encodes zlib) | 63 ms |
+
+  Measured with an inline script, not a committed benchmark.
+- **Decisions/deviations:**
+  - **Layers stay immutable**, so the README's `scene["counties"].visible = False` became `scene.hide("counties")` or `scene.update_layer(...)`; the assignment raises an error naming that call. This keeps edits atomic and lets the compositor recognise unchanged runs by identity.
+  - `add_layer` uses `left`/`top` (the format's names) instead of the README's `x`/`y`.
+  - Array replacement must keep the layer's size; to change size or placement, pass a layer object.
+  - A layer's pixels are re-encoded at every save until it is reloaded; caching that encoding is left to Session 12 (storage performance).
+  - Fonts and other assets cannot be added yet, so a new text slot must use a font already in the file (Session 09).
+- **Remaining/blockers:** none for Session 07.
+- **Next:** Session 08. Implement grid rendering: values → pixels through the index map, Matplotlib's float32 normalisation and the LUT (`docs/format.md` §8), exposed as `Scene.replace_grid(id, values)`, which swaps in a new `GridSlot` with the rendered pixels.
+
+### 2026-10-09 — Plan revision — benchmark figures, polygon slots first, smaller Session 12
+
+- **Work:** Planning only; no code changed. Reviewed progress through Session 07 with the user and revised the remaining sessions.
+- **Changes:**
+  - **New Session 07b (benchmark report and comparison figures),** next to run. Until now, timing evidence existed only as tables here and in `results.json`. The user wants figures comparing CartoStack's speed and efficiency with the standard Matplotlib/Cartopy render. `benchmarks/report.py` plots the Session 01/01b/02/06 results through a common schema. Every later session that records timings (08b, 08, 09, 12, 15, 16) regenerates it, which is now part of workflow step 4 and of those sessions' checklists. Figures keep cold, warm and loop speed-ups separate (for example, QPF is ~37× cold but ~5.9× per warm product), and pair speed with accuracy.
+  - **Session 08b (polygon slots) now runs before 08 (grid slots).** Both depend on 07b, and 09 depends on both. QPF is the primary real workload, and polygon fill is its largest remaining per-product cost. Nothing in polygon slots needs grid slots.
+  - **Package benchmark brought forward to 08b.** `benchmarks/package_qpf.py` measures the package itself (not the prototype) against the Cartopy baseline and the Session 02 prototype. A per-product regression of more than 10 % against the prototype must be investigated before 08b completes. Session 08 adds the grid equivalent, and Session 15 re-runs both from the installed wheel.
+  - **Session 12 reduced** to archive lifetime/close semantics, pre-flattened static runs, and reusing encoded bytes at save. Lazy decoding is now gated on measurement: Session 06 measured a full QPF load at 12 ms (~4 % of a cold product). It is implemented only if load plus decode exceeds 10 % of a cold product; otherwise it moves to the extension backlog (row added). Session 13's lazy/eager check is now conditional.
+  - Session 16 names the priority candidates from measurements so far: PNG encoding and polygon fill.
+- **Remaining/blockers:** none. Open user decision unchanged: production Matplotlib < 3.11 or a legend-title fix.
+- **Next:** Session 07b. Write the adapters from the existing `results.json`/`runtime.json`/`compare.json` files to the common schema, then the per-phase cold-product figure.
+
+### 2026-10-09 — Session 07b — completed
+
+- **Work:**
+  - Added `benchmarks/report.py` (PEP 723: matplotlib 3.11.2, numpy 2.5.3, Python 3.13, `exclude-newer = 2026-10-08`; lockfile `benchmarks/report.py.lock`). Matplotlib is used only by this benchmark script, never on the runtime path.
+  - **Common schema `cartostack-bench/1`**, documented in the script's docstring. Records have series, workload, mode (`cold-process`, `loop`, `warm`, `components`), config, source, runs with once-per-process phases, and products with per-product phases. Optional accuracy is attached. Phases: start-up, load, read input, render data, draw static content, text, composite, encode, other. Every run's total is the sum of its phases.
+  - **Adapters** for the Session 01 grid baseline, the Session 01b QPF baseline, the Session 02 prototype runtime with its `compare.json`, and the Session 06 compositor timing. Native `bench.json` files under `benchmarks/results/` (or `--bench`) are read directly, so 08b/08 only have to write that file. Inputs default to the latest of each kind; baselines need at least 5 cold runs (shorter runs are treated as smoke runs). The chosen paths go into `report.json`, `index.md` and every figure's footer.
+  - **Figures** (PNG, 150 dpi), using the `dataviz` skill's validated palette. One colour per series throughout: Cartopy blue, prototype orange, package aqua. Phases use the eight categorical slots in validated order, plus gray for "other".
+    - `speedup_summary.png`: cold, loop and warm speed-ups as separate rows, on a log axis, with the median ratio and a min–max range.
+    - `cold_phases.png`: total time to one PNG on a linear axis, next to each series' phase shares.
+    - `qpf_loop_cumulative.png`: every loop run, cumulative over 18 products.
+    - `qpf_time_vs_polygons.png`: data-render and whole-product time against polygon count.
+    - `accuracy_vs_speed.png`: per-product time against the share of pixels differing by more than 8 and more than 32 levels, for each Session 02 configuration.
+    - `package_components.png`: Session 06 package load, composite and encode times against the prototype.
+  - `index.md` repeats every plotted number as a table (the palette's contrast warning requires a table view), and adds the reconciliation against this log and the notes.
+- **Common basis (decision).** All totals are interpreter start plus in-process time, excluding measurement-only work (extra PNG encodes, output decode and hashing) and process exit, for every series.
+  - Per-product ("warm") values are the median over products of each product's median across runs. The first product in a process is excluded.
+  - Per-product speed-up ranges are the spread of same-product ratios.
+  - Loop totals are compared only when both series rendered the same product list. A 4-product smoke loop is refused, and the refusal is reported.
+- **Corrections found.** Several Session 02 headline ratios divided the baseline's process wall time by the prototype's in-process time. The baseline's process wall includes the post-run PNG analysis, the measurement encodes and process exit. On the common basis:
+
+  | Comparison | Common basis | Logged |
+  | --- | --- | --- |
+  | QPF cold | **35.7×** (11.93 s → 334 ms) | ≈ 37× |
+  | QPF 18-product loop | **7.6×** (27.62 s → 3.64 s) | ≈ 8.8× |
+  | QPF per product | **5.8×** (923 → 158 ms; reading the input is now included in both) | — |
+  | Grid cold | **131.5×** (16.11 s → 123 ms) | — |
+  | Grid warm | **8.1×** (269 → 33 ms) | 10.5× |
+
+  The grid warm baseline had included three extra encodes and hashing. No Session 02 decision changes. The older log entries are left as recorded.
+- **Adapter bugs caught and fixed while verifying.**
+  - The prototype imports NumPy at module level, so its NumPy time is already inside `pre_main_s`. Counting it again had made "other" negative.
+  - The prototype's `render_total` excludes `read_input`.
+  - The report now refuses to plot if any phase comes out below −1 ms, or if a phase name is unknown.
+- **Verification:**
+  - `uv run benchmarks/report.py` → `benchmarks/results/report-20261009T144517Z/`. 18 of the 19 logged values were recomputed on the log's own basis and match to the quoted precision. The exception is Session 02's "0.156 s" per product: the data give 0.1567 s (a truncation in the log).
+  - All six figures were inspected visually. Two layout problems were fixed and re-inspected: overlapping titles and labels, and a wrong grid config label. One basis problem was also fixed: the components figure first compared prototype PNG loads with package zlib loads.
+  - Smoke test of the native path: a synthetic `bench.json` with `package` cold and loop records (in the session scratchpad, not in `benchmarks/results`) produced the package series in the speed-up figure. Its 4-product loop was refused for loop totals, as intended.
+  - `uvx ruff check --line-length 120 benchmarks/`, `uv run ruff check .` and `uv run ruff format --check .` pass. Three intermediate report directories from this session were deleted; only the final one remains.
+- **Evidence:** `benchmarks/results/report-20261009T144517Z/` (`index.md`, `report.json`, six PNGs).
+- **Remaining/blockers:** none.
+- **Next:** Session 08b. Port the NumPy LCC and polygon fill from `benchmarks/prototype_runtime.py` into `cartostack/projection.py` and a polygon slot. Then write `benchmarks/package_qpf.py` to emit `bench.json` with series `package`, and regenerate the report.
+
+### 2026-10-09 — Session 08b — completed
+
+- **Work:**
+  - **`src/cartostack/projection.py`:** ellipsoidal Lambert Conformal Conic forward projection in NumPy (Snyder eq. 15-1…15-10; tangent cone when `lat_1 == lat_2`). Constants are cached per `Projection`. `to_pixels` applies `world_to_pixel`. `ProjectionError` covers an unsupported projection, invalid parameters (re-checked even for directly built geometries), non-finite input, latitudes outside ±90, and the pole opposite the cone's apex. Longitudes are reduced to within 180° of `lon_0`, as PROJ does.
+  - **`src/cartostack/polygons.py`:**
+    - `normalize`: one record per value. A record is a list of `(n, 2)` rings, or one bare ring. Ragged lists, `None` and generators are accepted; values must be real numbers.
+    - `classify`: Python `round`, first matching bin in list order, closed-open intervals, NaN to the fallback. A value with no bin and no fallback raises `PolygonDataError` naming the record.
+    - `coverage`: the exact sample-centre fill (see Decisions).
+    - `_blend`: Pillow's integer source-over, run only on partly covered pixels or translucent colours. Fully covered opaque pixels are assigned through a `uint32` view of the buffer.
+    - `render`: projects every vertex of a product in one call and draws records in stable bin order.
+    - `records_from_features` / `geometry_rings`: GeoJSON-like `FeatureCollection`, `Feature`, `Polygon` and `MultiPolygon` input, or any `__geo_interface__` object (shapely, GeoPandas). Neither library is imported; z coordinates are dropped.
+  - **`Scene.replace_polygons(id, records, values)`:** renders, then swaps in a new `PolygonSlot` through `evolve` and `_commit`. It is atomic and re-composites only the slot. `PolygonDataError` and `ProjectionError` are exported from `cartostack`.
+  - **`docs/format.md` §9** now states the fill exactly (spec changed before code relied on it). It covers the sample positions, the half-open crossing rule, sub-pixel clipping, `floor(a·c/k² + 0.5)` alpha with the §6.2 operator, and a "Choosing `k`" table recommending `supersample: 4`.
+  - **Tests:**
+    - `tests/test_projection.py` (26 tests): Snyder's two published worked examples (ellipsoid to 0.15 m, unit sphere to 1e-7), round trips through an independently written Snyder inverse (1e-9°) for five projections, wrapping, poles, invalid input and projections, and pyproj agreement within 1 mm over 61 × 41 grids for four projections (build extra).
+    - `tests/test_polygons.py` (51 tests):
+      - the exact fill against a brute-force even-odd test of every sample, over 360 random polygons with k = 1–5, including vertices on the sample grid (ties), clips and far-away vertices;
+      - hand-computed pixels for squares, holes and islands, ring orientation, a 2× partial edge (alpha 128), partial and translucent blending against Pillow, draw order with ties, clipping to fractional axes, local placement and off-map input;
+      - classification and input-validation cases, and GeoJSON-like input;
+      - `Scene` behaviour: a new object swapped in, atomic failure, refusal for non-polygon layers, only the slot re-composited, and save/load/replace round trips;
+      - a fresh-process `load` → `replace_polygons` → `save_png` with none of matplotlib, cartopy, pyproj, shapely, geopandas or pyogrio imported.
+    - `tests/helpers.py` gains `lcc_inverse`, `map_geometry` (small consistent LCC canvases with arbitrary fractional axes) and `pixels_to_lonlat`.
+  - **`benchmarks/package_qpf.py`** (project environment): builds QPF scenes from the Session 02 prototype layers at k = 4 (default), 1 and 2. Fresh processes load a scene and, per product, read the WPC shapefile (prototype NumPy reader), call `replace_polygons`, swap in a subtitle `TextSlot` with pixels from the prototype's Pillow code (until Session 09), composite, and encode RGBA level 6. It compares all 18 outputs with their Session 01b Cartopy renders using the Session 02 regions, and writes `bench.json` for the report. `benchmarks/report.py` gained package config labels, and its accuracy figure is now one row per configuration (bars for time, dots for pixel differences), because the scatter version became unreadable once the package points clustered next to the prototype's.
+- **Decisions/deviations:**
+  - **Exact NumPy fill instead of porting the prototype's Pillow fill.** Probing showed that Pillow truncates vertex coordinates and fills every pixel an edge touches, so the prototype was about half a sample too wide on every side and did not implement the §9 rule. The new fill:
+    - computes each sample row's edge crossings with the half-open rule;
+    - sorts them with `int32` keys (twice as fast as `int64`) and pairs them into runs, clamped to the clip;
+    - scatters the runs' ends into a pixel-resolution difference array and takes one prefix sum per record.
+
+    Its cost grows with crossings plus the bounding box at pixel resolution, not with k². It matches the brute force exactly. Crossings are computed as multiply-then-divide, which is exact for representable ties; the first version divided first and failed one tie case in 300.
+  - Each record is composited with its coverage directly, not via the checklist's intermediate "bin-index image". This is equivalent for opaque bins and also correct for translucent ones and for partial coverage between neighbouring bins.
+  - **Default edge treatment: `supersample: 4`** (was 2 in Session 02). The exact 4× fill costs only 5–15 % more than 2× and leaves 0.000 % of clear-map pixels more than 32 levels off Cartopy (median; worst 0.001 %), against 0.057 % at 2× and 0.386 % at 1×. The format's default stays 1; writers (Session 10) use 4.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 12 files) and `uv lock --check` pass.
+  - `uv run pytest`: **277 passed, 5 skipped** core-only. **282 passed** with `--extra build`, including the pyproj comparisons (environment restored to core only afterwards). **277 passed, 5 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0 (lowest direct dependencies, venv in the session scratchpad).
+  - `uvx ruff check --line-length 120 benchmarks/` passes.
+  - `uv run python benchmarks/package_qpf.py` → `benchmarks/results/package-qpf-20261009T151524Z/`; no child loaded a forbidden module. `uv run benchmarks/report.py` → `report-20261009T151632Z/`. All six figures were inspected; the accuracy figure was redone and re-inspected.
+  - Three earlier benchmark runs and their reports were deleted as superseded: one failed while building scenes, one used a raster subtitle (which re-flattened a static run every product), and one predated the blend and sort optimisations.
+- **Evidence (Apple M3 Pro; common basis of the 07b report):**
+
+  | QPF, 2210 × 1848 | Cartopy | Prototype (Pillow 2×) | Package (exact 4×) |
+  | --- | --- | --- | --- |
+  | Day 1-3, fresh process | 11.93 s | 334 ms (35.7×) | **286 ms (41.7×)** |
+  | 18 products, one process | 27.62 s | 3.64 s (7.6×) | **2.52 s (11.0×)** |
+  | Per product after the first (median) | 923 ms | 158 ms (5.8×) | **124 ms (7.4×)** |
+  | Pixels > 8 / > 32 levels off (all pixels, median) | — | 0.33 % / 0.090 % | **0.11 % / 0.000 %** |
+
+  - **Polygon fill per product** (median over products 2–18; Day 1-7 in brackets): k = 1: 40 ms (118); k = 2: 42 ms (125); k = 4: 45 ms (148). The prototype's 2× took 80 ms median.
+  - **Package phases per product at 4×:** read 1.0 ms, polygons 45 ms, text 1.4 ms, composite 12 ms, PNG 63 ms. PNG encoding is now about half of each product.
+  - **Cold Day 1-3:** start-up 77 ms, load 12 ms, polygons 89 ms, composite 24 ms (first render; see the handoff).
+  - **Regression gate (no regression greater than 10 % per product against the prototype):** passed. The package is 22 % faster per product at its default, and its polygon phase is 1.8× faster than the prototype's at 2× and 2.4× faster than the prototype's at 4×.
+- **Remaining/blockers:** none for Session 08b. Recorded for later sessions: the cold first-render cost of the bottom static run (Session 12/16), and PNG encoding as the dominant per-product cost (Session 16 backlog item).
+- **Next:** Session 08. Implement `Scene.replace_grid(id, values)` by porting `render_grid`/`grid_colors` from `benchmarks/prototype_runtime.py` per `docs/format.md` §8. Swap in a new `GridSlot` through `evolve`/`_commit`, add a package grid benchmark writing `bench.json`, and regenerate the report.
+
+### 2026-10-09 — Session 08 — completed
+
+- **Work:**
+  - **`src/cartostack/grids.py`:**
+    - `check_values` requires exactly the slot's `(ny, nx)` shape and a real numeric dtype (integers or floats). Bool, complex and strings raise `GridMismatchError`. Masked arrays mark bad cells, and values are converted to `value_dtype`.
+    - `lut_rows` implements Matplotlib's `Normalize` and `Colormap.__call__`.
+    - `cell_colors` applies the slot alpha, keeping Matplotlib's all-zero bad colour transparent.
+    - `render` does one `uint32` gather per pixel through `index_map + 1`, with row 0 transparent for `−1`.
+  - **`Scene.replace_grid(id, values, *, vmin=None, vmax=None, lut=None)`:** validates new styling through `evolve`, renders, and swaps in a new `GridSlot` (atomic; `index_map` shared, not copied). Changing `vmin`, `vmax` or the LUT (including `n_colors`) lists that grid's colorbars in **`Scene.stale_colorbars`** until they are replaced or removed; Session 11 redraws them. `GridMismatchError` is exported.
+  - **Latent bug fixed in `layers.evolve`:** it dropped cached encoded bytes only for `pixels`. A runtime LUT or index-map change would therefore have been saved from the old bytes. It now drops the bytes of every changed buffer (`ENCODED_ROLES`). Test added in `tests/test_layers.py`; `tests/test_grids.py` checks the saved norm and LUT bytes.
+  - **`docs/format.md` §8:**
+    - The exact arithmetic: each step in float64, rounded to `value_dtype`.
+    - Bad values take `bad` even when out of range.
+    - The all-zero bad colour keeps alpha 0.
+    - A new "Runtime changes" rule for `vmin`/`vmax`/LUT.
+  - **`tests/test_grids.py`** (35 tests):
+    - LUT rows at every boundary (`x == n_colors`, ±1e-6, ±inf, NaN), masks, the alpha and bad-colour rules, and the float64 arithmetic against a float32 shortcut that really differs.
+    - `value_dtype` float64, integer input, invalid shapes and dtypes, index-map gathering, and a magnified 2 × 2 grid with a no-data border.
+    - **Exact equality with Matplotlib 3.11.2** `cmap(Normalize(vmin, vmax)(v), bytes=True)` for four ranges, including bin edges and their float32 neighbours, NaN, under/over, and alpha 0.8 (build extra).
+    - `Scene` behaviour: a new object swapped in, five atomic-failure cases, stale-colorbar tracking, saving the new norm and LUT, only the slot re-composited, refusal for other layers, and a fresh process importing no rendering library.
+  - **`benchmarks/package_grid.py`** (project environment): builds the Session 01 grid scene from the prototype layers (`compositor_timing.grid_scene`). It times cold variant-0 runs and loops of variants 0–3 in fresh processes: `make_field` as input, `replace_grid`, the subtitle text slot via the prototype's Pillow code, composite, and PNG RGB level 6. It compares outputs with Session 02's `pcolormesh` references, times in-process renders for 500 × 500 and HRRR-sized grids, and writes `bench.json`. To share code, `run_child` and `to_record` in `package_qpf.py` now take the script and workload. `report.py` labels the package grid configuration.
+- **Decisions/deviations:**
+  - **Matplotlib's arithmetic, not the prototype's.** The prototype computed in float32 with Python scalars, which matches Matplotlib only for "nice" ranges. Against Matplotlib 3.10.6 on 3M random values per range, it differed for 55 % (0.1–0.7), 69 % (−3.3–0.001), 100 % (250.15–310.7) and 57 % (1e-5–3e-5) of values, and for 0 % with the benchmark's −10–35. Computing each step in float64 and rounding to float32 gave 0 differences for every range. The spec now requires that.
+  - "LUT regenerated from a stored colormap definition or supplied by the caller": the format stores LUTs, not colormap definitions, so the caller supplies the new LUT. Regenerating LUTs from named colormaps would need Matplotlib or a colormap table, which is out of scope for the runtime.
+  - Values of another float type are converted to `value_dtype` rather than refused. Results match Matplotlib exactly when the input dtype equals `value_dtype`.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 13 files) and `uv lock --check` pass.
+  - `uv run pytest`: **309 passed, 9 skipped** core-only. **318 passed** with `--extra build` (environment restored to core only afterwards). **309 passed, 9 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0.
+  - `uvx ruff check --line-length 120 benchmarks/` passes.
+  - `uv run python benchmarks/package_grid.py` → `benchmarks/results/package-grid-20261009T153231Z/`; no child loaded a forbidden module. `uv run benchmarks/report.py` → `report-20261009T153248Z/`. Figures inspected.
+  - `uv run python benchmarks/compositor_timing.py --reps 3` still runs after the `evolve` change (smoke run; its output was deleted).
+- **Evidence (Apple M3 Pro; common basis of the 07b report):**
+
+  | Grid scene, 1200 × 800 | Cartopy | Prototype | Package |
+  | --- | --- | --- | --- |
+  | Variant 0, fresh process | 16.11 s | 123 ms (131.5×) | **127 ms (127.0×)** |
+  | Per product, warm | 269 ms | 33 ms (8.1×) | **26 ms (10.4×)** |
+  | Pixels > 8 / > 32 levels off (all pixels, median) | — | 2.31 % / 0.320 % | 2.31 % / 0.320 % |
+
+  - **Against Session 02's `pcolormesh` references:** clear-map pixels differ by more than 8 levels in 2.02 % (median of 4 variants), at most 23 levels. These are Matplotlib's semi-transparent `pcolormesh` cell seams, which an index map does not reproduce; they were expected and are the same as in Session 02. The package's PNGs are **pixel-identical** to the prototype's for all four variants.
+  - **Grid render timing** (in-process, median of 20):
+
+    | Grid | Pixels shown | `grids.render` | `replace_grid` |
+    | --- | --- | --- | --- |
+    | 500 × 500 | 527,904 | 3.1 ms | 3.2 ms |
+    | HRRR-sized 1799 × 1059 | 1,910,861 | 19.6 ms | 20.0 ms |
+
+  - **Per product in the loop:** grid 3.3 ms, PNG encoding about 18 ms. Cold is 3 % slower than the prototype (127 vs 123 ms; start-up and first render), and warm products are 21 % faster.
+- **Remaining/blockers:** none.
+- **Next:** Session 09. Port `render_text` into the package, settle `scene.text[...]`, then switch both package benchmarks to it and verify the core-only milestone.
+
+### 2026-10-09 — Session 09 — completed
+
+- **Work:**
+  - **`src/cartostack/text.py`:** text slots laid out with Matplotlib 3.11's single-line rule and rendered with Pillow.
+    - Shaping applies GSUB ligatures. Pen positions are hinted advances plus GPOS kerning, each kerning value rounded to 1/64 px as HarfBuzz rounds it.
+    - The ink box gives the width from the pen origin. The ascent and descent are at least the font's OS/2 typographic ascender/descender (`hhea` fallback).
+    - Origin by `ha`/`va`, then optional `snap` and `offset`.
+    - Each glyph is rendered by FreeType at a whole pixel, then shifted by its sub-pixel remainder with bilinear interpolation and composited source-over.
+    - The layer holds straight-alpha pixels cropped to the ink and to the canvas. Blank or off-canvas text gives no pixels.
+    - A missing or unusable font raises `TextFontError`; another font is never substituted.
+  - **`src/cartostack/_opentype.py`** (standard library only): reads `head`, OS/2/`hhea` metrics, `cmap` formats 4 and 12, GSUB `rlig`/`liga`/`clig` ligature lookups (types 4 and 7), and GPOS `kern` pair adjustments (formats 1 and 2, extension type 9), else a format 0 `kern` table. A ligature is kept only when its glyph has a code point, because Pillow renders characters, not glyph ids. Parsing takes 0.5 ms for DejaVu Sans.
+  - **`Scene.replace_text(id, value)` and `scene.text`** (a mapping: `scene.text[id]` reads, `scene.text[id] = s` re-renders, `del` raises a `TypeError` that names `remove_layer`). The slot is swapped in through `evolve`/`_commit`, so it is atomic, and only `value`, `left`, `top` and the pixels change. `TextFontError` is exported.
+  - **`docs/format.md` §10** now specifies the Matplotlib 3.11 layout (shaping, box, origin, sub-pixel glyphs), records `snap: null` and `offset: [0, 0]` for Matplotlib ≥ 3.11, and documents the measured differences and what is not reproduced. The `docs/examples/` manifests keep the Session 02 prototype's `snap: "round"` and `offset: [0, −1]`, which remain valid values.
+  - **`tests/test_text.py`** (84 tests; 36 core-only, 48 Matplotlib comparisons with the build extra). Core tests use Pillow's bundled TrueType font, which has GPOS kerning and ligatures, so they need no extra fixture.
+    - Font errors, font tables, kerned pen positions, ligatures drawn as one glyph, `ha`/`va` rules, typographic versus ink metrics, snap and offset, and 0.25/0.5/0.75 px anchor shifts moving the ink by the same fraction (±0.02 px).
+    - Colour and alpha, blank and off-canvas text, the one-line rule, and `scene.text` behaviour: atomic failures, round trips, and a broken font raising without fallback.
+    - **The core-runtime milestone**: a hand-built `.cstack` with raster, grid, polygon and text slots is loaded in a fresh process. It takes new grid values, polygons and text plus an added layer, writes a PNG, and imports none of matplotlib, cartopy, pyproj, shapely, geopandas or pandas.
+    - **Against Matplotlib 3.11.2** (build extra), for DejaVu Sans, Oblique and Bold at 11–58 px with plain, kerned and ligature strings: the shaped glyph ids equal Matplotlib's and pen positions agree within 1/64 px. Over four alignments: centroid within 0.3 px horizontally and 0.01 px vertically, ink amount within 0.2 %, and pixels more than 32 levels off below 40 % (small) or 25 % (large).
+  - **Benchmarks:** `package_qpf.py` and `package_grid.py` set the subtitle through `scene.text` (Matplotlib 3.11 settings) instead of the prototype's Pillow code, and report text-region accuracy. `report.py` keeps only the newest native record per series, workload, mode and config.
+- **Decisions/deviations:**
+  - **Matplotlib 3.11 changed text rendering**, which Session 02's notes assumed was forced auto-hinting with a hinting factor of 8:
+    - hinting is now FreeType's default (native hinting, the same as Pillow's);
+    - layout is HarfBuzz (kerning and ligatures);
+    - minimum line metrics come from the font's OS/2 typographic values, not from `"lp"`;
+    - glyphs are drawn at 1/64-px positions without whole-pixel snapping or the old one-pixel lift.
+
+    The prototype's `"lp"` rule plus a −1 px offset matched the QPF subtitle only because 10 + 1 px equalled the 11.0 px typographic descent at that size. The spec and code now follow 3.11. The ink-left rule (Matplotlib measures the width from the pen origin) was found through Oblique `A`, whose ink starts left of the origin.
+  - **Remaining differences are anti-aliasing.** Pillow cannot rasterise at fractional positions, so glyphs are rendered at whole pixels and shifted bilinearly. Across the comparison set, a median of 11–14 % of inked pixels differ by more than 32 levels at 30–58 px, and 21–27 % at 11–17 px. Placement is within 0.02 px (worst 0.22 px) horizontally and 0.006 px vertically. Rounding to whole pixels instead gave 30–60 %.
+  - **Not reproduced:** contextual alternates, mark positioning, and ligatures without a code point. Raqm (full HarfBuzz shaping in Pillow) needs a system FriBiDi library, which would break the NumPy + Pillow-only runtime.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 15 files), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+  - `uv run pytest`: **333 passed, 69 skipped** in the core-only environment (`uv sync --group dev`; matplotlib, cartopy and pyproj not installed), including `test_core_runtime_milestone`. **402 passed** with `--extra build`. **333 passed, 69 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0. The environment was restored to core only.
+  - `uv run python benchmarks/package_qpf.py` → `package-qpf-20261009T165539Z/`; `uv run python benchmarks/package_grid.py` → `package-grid-20261009T165603Z/`; `uv run benchmarks/report.py` → `report-20261009T165625Z/`. Figures inspected, and the inputs list shows only the newest package runs.
+- **Evidence:**
+
+  | Text against the full Cartopy render | Prototype (Session 02) | Package |
+  | --- | --- | --- |
+  | QPF subtitle, 45.8 px: text-region pixels > 8 / > 32 levels off; max | 4.9 % / 0 %; 24 | **2.65 % / 0 %; 21** |
+  | Grid subtitle, 16.7 px: text-region pixels > 32 levels off | 27 % | **8.2 %** |
+  | QPF, all pixels > 8 levels off (median) | 0.33 % | **0.069 %** (4×) |
+  | Grid, all pixels > 32 levels off (median) | 0.32 % | **0.099 %** |
+
+  | Speed (common basis) | Cartopy | Package |
+  | --- | --- | --- |
+  | QPF Day 1-3, fresh process | 11.93 s | 291 ms (41.0×) |
+  | QPF, 18 products in one process | 27.62 s | 2.48 s (11.1×) |
+  | QPF, per product after the first | 923 ms | 123 ms (7.5×) |
+  | Grid, fresh process | 16.11 s | 132 ms (121.6×) |
+  | Grid, per product (warm) | 269 ms | 28 ms (9.5×) |
+
+  - Text costs 1.1–1.3 ms per product warm (the prototype took 1.1–1.4 ms) and 3–5 ms for the first text in a process (FreeType loading and the glyph cache).
+  - The cold grid product is about 5 ms slower than in Session 08 (127 → 132 ms): the first text render plus run-to-run noise.
+- **Remaining/blockers:** none. The core-runtime milestone (after 09) is met.
+- **Next:** Session 10. Build `cartostack.build.SceneBuilder` (fixed-geometry figures, static-layer capture, index maps by the index-image method, polygon and text slot definitions with the Session 08b and 09 defaults, and the georeference export), then compare an authored and updated file with a full Cartopy render.
+
+### 2026-10-09 — Session 10 — completed
+
+- **Work:**
+  - **`cartostack.build`** (the `build` extra; never imported by `import cartostack`):
+    - **`SceneBuilder(fig, ax, *, dpi, crop)`** wraps an existing figure, such as the unmodified QPF example's.
+    - **`SceneBuilder.new(projection, extent, *, width, height, dpi, axes, …)`** creates one.
+    - Every visible *unit* of the figure goes to exactly one layer. Units are the map axes' children, other axes as a whole, and figure-level artists. Assignment is by `artists=`, by the artists a `draw(ax)` callback creates, or by a `zorder=(lo, hi)` band.
+    - Slot artists (data previews, the text artist) are hidden from static layers. The figure and map-axes background patches go only to the layer marked `background=True`.
+    - Unassigned visible units are an error, unless `build(rest=<layer>)` names a layer for them. Assigning a unit twice and reusing an id are errors too.
+    - Layers stacked against Matplotlib's draw order raise a warning only when the misordered artists' rendered pixels actually overlap the other layer; the check renders just those artists.
+    - Each static layer is rendered alone with `savefig` at the output DPI and crop, has canonical transparent pixels, and is cropped to its ink.
+  - **`build/georef.py`:**
+    - `crop="tight"` is resolved once to an explicit box, which Session 02 showed equals `bbox_inches="tight"`. The canvas size is the truncated `savefig` size.
+    - The resolved axes rectangle comes from `apply_aspect`.
+    - The georeference takes the projection from `proj4_params` plus the pyproj ellipsoid (`a`, `f`; sphere `f = 0`); LCC parameters get their defaults filled in. The projected extent is `ax.get_extent()`, and the affine is fitted from `ax.transData` and checked to be affine at a probe point.
+  - **`build/index_map.py`:** the index-image method for 1-D or 2-D lon/lat given as cell `centers` (`shading="nearest"`) or `edges` (`"flat"`). Cells are encoded in 24 bits (at most 16,777,215 cells) with anti-aliasing off. Partly covered pixels, and pixels whose centre is outside the clip region, are −1.
+  - **Slot definitions:**
+    - Grid: the LUT from the colormap, `vmin`/`vmax` or a linear norm, alpha, extend, cells and `value_dtype`.
+    - Polygon: bins as `(lower, upper, colour, order)` with Matplotlib colours converted to RGBA; fallback as `(colour, order)`; `supersample` defaults to 4.
+    - Text: from a `Text` artist (anchor via its transform, `size_px = fontsize · dpi / 72`, colour with alpha, alignment, `snap: null`, `offset: [0, 0]`), or a new `fig.text(...)`. The font file is embedded as `fonts/<name>`, and two different fonts with the same file name are refused. Rotated, multi-line and mathtext/usetex text are refused.
+    - Optional initial values render the slots' pixels with the runtime itself.
+  - The provenance records the authoring tool and its Matplotlib and Cartopy versions.
+  - **Packaging bug fixed:** `.gitignore` had `build/`, which also matched `src/cartostack/build/`. That hid the authoring package from git, and Hatchling (which honours `.gitignore`) would have left it out of the wheel and sdist. The rule is now anchored to the root (`/build/`). `uv build` was checked to include all four `cartostack/build` files, and a new test, `tests/test_package.py::test_no_package_source_is_gitignored`, fails if any file under `src/cartostack` is ignored (verified to fail with the old rule).
+  - **The build extra now requires Matplotlib ≥ 3.11** (`pyproject.toml`, `uv.lock`), and `SceneBuilder` refuses older versions, because text slots reproduce 3.11's layout. mypy overrides cover Cartopy (no type information) and the build libraries in the core-only environment.
+  - **`docs/format.md` §8:** writers SHOULD store LUT channels as `round(c · 255)`.
+  - **`tests/test_build.py`** (21 tests, build extra; skipped as a module without it):
+    - Geometry: the resolved axes rectangle and the georeference, and a tight crop equal to `savefig(bbox_inches="tight")` at 100 and 300 dpi.
+    - **Control points:** 391 lon/lat points map through the stored georeference, through both the NumPy LCC and pyproj with the stored affine, to where Cartopy draws them, within 0.01 px.
+    - Layers composite back to the full render: pixels more than 32 levels off are below 0.5 % with an alpha-0.8 grid and below 0.2 % with an opaque one. Layers are cropped and the background is not duplicated.
+    - Assignment rules, zorder bands, the draw-order warning and its no-overlap case, and refusal of Matplotlib < 3.11.
+    - **Index maps** for centres and edges, 1-D and 2-D: more than 99.5 % of mapped pixels are identical to `pcolormesh` with anti-aliasing off.
+    - Polygon and text definitions, refusal of unsupported text, and polygon slots needing a supported projection.
+    - **End to end:** author with data A, then update to grid values, polygons and text B in a fresh process that imports no Matplotlib, Cartopy, pyproj or shapely. Compared with Cartopy drawing B, fewer than 0.5 % of pixels are more than 32 levels off and fewer than 2 % more than 8.
+  - **`benchmarks/author_scenes.py`** (PEP 723 using the local `cartostack[build]` plus GeoPandas; lockfile) authors **`qpf.cstack`** from `baseline_qpf.build_figure` for Day 1-3, unchanged: zorder bands `below` < 10 ≤ `above`, the polygon slot from `QPF_RANGES`, and the subtitle slot, at 300 dpi with the tight crop. It also authors **`grid.cstack`** from `baseline_cartopy.build_scene` (grid slot from the mesh's cmap and norm; title and colorbar axes in `above`). `package_qpf.py` and `package_grid.py` gained `--scene` to benchmark an authored file.
+- **Decisions/deviations:**
+  - The LUT is rounded, not truncated. With `cmap(..., bytes=True)` (truncation), most grid pixels were one level off Matplotlib's rendered mesh, because Agg rounds. Rounding, as the Session 02 prototype did, makes the index-map test pixel-exact.
+  - Draw-order checking is pixel-based. The first version warned for the QPF subtitle, which shares zorder 1000 with the legend and attribution but overlaps neither; only an overlap of the late-drawn artists now warns.
+  - Colorbars stay static rasters in this session (the grid scene's colorbar axes is in `above`). Their own kind is Session 11.
+  - Wrapping existing figures is the primary path, so the real example needs no rewriting; `new()` with draw callbacks follows the README sketch.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 19 files, in both environments), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+  - `uv run pytest`: **424 passed** with `--extra build`. **334 passed, 70 skipped** core-only. **334 passed, 70 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0. The environment was restored to core only.
+  - `uv run benchmarks/author_scenes.py` → `authored-20261009T174311Z/`. `package_qpf.py --scene …/qpf.cstack` → `package-qpf-20261009T174405Z/`; `package_grid.py --scene …/grid.cstack` → `package-grid-20261009T174414Z/`; `report.py` → `report-20261009T174512Z/`.
+  - Four back-to-back noise-check runs (authored versus assembled QPF scene, 2.56–2.80 s per 18-product loop for both) were deleted so that the report would not pick them up.
+- **Evidence:**
+
+  | Authored file | Size | Layers | Build time | Layers vs full render of the same figure |
+  | --- | --- | --- | --- | --- |
+  | `qpf.cstack`, 2210 × 1848 @ 300 dpi | 1.09 MB | below, qpf, above, subtitle | 11.7 s | > 8 levels 0.043 %, > 32 levels 0 %, max 21 (data slot empty) |
+  | `grid.cstack`, 1200 × 800 @ 100 dpi | 1.34 MB | below, temperature, above, subtitle | 16.4 s | > 8 levels 1.85 %, > 32 levels 0.099 %, max 75 (`pcolormesh` seams, text) |
+
+  - **Updated authored files against the full Cartopy renders** of each product are identical in accuracy to the hand-assembled scenes of Sessions 08b–09. QPF, all 18 products: 0.069 % / 0.000 % of pixels more than 8 / 32 levels off; subtitle region 2.65 % / 0 %, max 21. Grid, 4 variants: 2.20 % / 0.099 %.
+  - **Speed** (report, common basis): QPF Day 1-3 cold 302 ms (39.5×), 18-product loop 2.65 s (10.4×), 128 ms per product (7.2×); grid cold 137 ms (118×), warm 29 ms (9.1×). Back-to-back runs showed no difference between authored and assembled scenes; the drop from Session 09's figures (2.48 s, 123 ms) is run-to-run variation on this machine (2.56–2.80 s for either).
+- **Remaining/blockers:** none.
+- **Next:** Session 11. Colorbar layer kind: author it from the colorbar axes, redraw it with NumPy/Pillow when `stale_colorbars` lists it, and run the build-to-runtime milestone comparison.
+
+### 2026-10-09 — Session 11 — completed
+
+- **Work:**
+  - **Colorbar redraw data** (`ColorbarRedraw` on `ColorbarLayer`; `docs/format.md` §7; optional `colorbar.redraw` in the manifest and JSON Schema). It holds:
+    - `orientation` and `box`, the strip from `vmin` to `vmax`;
+    - `rows`, the LUT row of every strip pixel, with under/over for the extension triangles;
+    - the `under`, `over` and `label` rasters (the axis label is separate so that it can move);
+    - `label_edge`;
+    - tick style: locator (`auto` with the resolved `nbins` and `steps`, or `fixed` values), side, direction, length, width and colour;
+    - tick-label style: embedded font, size, colour, pad and minus sign.
+  - **`src/cartostack/colorbars.py`:**
+    - Exact ports of Matplotlib's `MaxNLocator` (`_nonsingular`, `scale_range`, `_Edge_integer`, `_raw_ticks`) and of `ScalarFormatter` (`_compute_offset`, `_set_order_of_magnitude`, `_set_format`, Unicode minus).
+    - A range that would need an offset or scientific-notation label raises `ColorbarRedrawError`, and the colorbar stays stale.
+    - `render` composites under → strip (recoloured from the slot's LUT and alpha; another `n_colors` re-bands by position) → over → tick marks (exact coverage, odd-width strokes centred on pixel centres) → tick labels (text-slot renderer) → the axis label, shifted by the whole-pixel change in the tick labels' outer edge.
+  - **`Scene`:**
+    - `replace_grid` redraws, in the same atomic commit, every colorbar of the slot whose `vmin`, `vmax` or LUT changed and that has redraw data. Colorbars without redraw data, or whose new range needs an offset, are listed in `stale_colorbars`.
+    - `redraw_colorbar(id)` redraws explicitly.
+    - The redraw data loads and saves (`colorbars/<id>/rows.i32.zz`, `under/over/label.rgba8.zz`).
+    - `ColorbarRedraw` and `ColorbarRedrawError` are exported.
+  - **Text:** `va: "center_baseline"` (Matplotlib's vertical-axis tick labels; baseline at `y + a/2`) in the code, the spec (§10) and the schema.
+  - **`SceneBuilder.add_colorbar(id, colorbar, *, slot, order)`:**
+    - Renders the colorbar axes as the layer, padded by 4 × the label size so longer labels after a range change fit.
+    - Renders `over` with ticks and labels laid out but transparent, so the axis label keeps its place, and `label` alone.
+    - Makes `rows` by an index image: each band coloured with its LUT row's code via `grids.lut_rows`, triangles coded under/over, anti-aliasing off.
+    - Reads the tick and label style from the axis, and computes `label_edge` with the runtime's own layout.
+    - Unsupported locators or formatters keep the colorbar as drawn, with a warning.
+  - **Legends:** a legend can be its own static raster layer (`add_static(artists=[legend])`), which the milestone test covers. Raster legends need nothing new at runtime.
+  - **`benchmarks/author_scenes.py`:** the grid scene's colorbar is now a colorbar layer, and the script records `replace_grid` timings with and without a new normalisation.
+  - **Tests:**
+    - `tests/test_colorbars.py` (25 tests; 2 build-extra): hand-computed tick values and labels, offset/scientific refusals, fixed ticks, strip recolouring with alpha, re-banding for a new LUT size, ticks and labels following a new range, stale handling without redraw data or with an offset range, file round trips, size validation, **1,500 random ranges identical to Matplotlib's locator and formatter**, and authored horizontal and vertical colorbars redrawn for 4 ranges and compared with Matplotlib redrawing them.
+    - `tests/test_build.py`: **the build-to-runtime milestone test.**
+- **Fixes found on the way:**
+  - **Lint gap:** with `.gitignore` anchored in Session 10, Ruff (which honours `.gitignore`) checked `src/cartostack/build/` for the first time and found 11 issues: long lines hidden behind `# fmt: skip`, a docstring `×`, and a non-`pairwise` loop. Fixed.
+  - **Canvas size:** `georef.canvas_size` now truncates the way Matplotlib's `get_width_height` does, which rounds up within 1e-8 px. A 460 px figure (4.6 in × 100 = 459.99999999999994) had come out 1 px short.
+  - **Over raster:** removing ticks with a `NullLocator` let Matplotlib move the axis label into the tick-label space. Ticks and labels are now kept in place but transparent.
+  - **Vertical colorbars:** Matplotlib moves the axis label with the widest tick label, by up to 8 px across the tested ranges. It is now a separate raster shifted at runtime, which brings the residual centroid error under 0.04 px.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .` (now including `cartostack.build`), `uv run mypy` (strict, 20 files, both environments), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+  - `uv run pytest`: **450 passed** with `--extra build`. **356 passed, 73 skipped** core-only. **356 passed, 73 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0. The environment was restored to core only.
+  - `uv run benchmarks/author_scenes.py` → `authored-20261009T185718Z/`; `package_grid.py --scene …/grid.cstack` → `package-grid-20261009T185754Z/`; `report.py` → `report-20261009T185757Z/`.
+- **Evidence:**
+  - **Tick and label ports:** 3,000 (development) plus 1,500 (test) random ranges. Every tick value and label is identical to Matplotlib 3.11.2. The 643 of 3,000 refused ranges are exactly those where `ScalarFormatter` shows an offset or a multiplier.
+  - **Authored colorbars redrawn against Matplotlib**, horizontal and vertical, for −10–35, −5–30, 0–1 and 250–310:
+    - the strip has under 1 % of pixels more than 32 levels off;
+    - total ink is within 3 %;
+    - the centroids of ticks and labels are within 0.15 px (0.04 px excluding the axis label);
+    - the rest is text anti-aliasing at 12.5 px.
+  - **Build-to-runtime milestone:** a 640 × 520 map with background, grid (alpha 0.8), polygons, borders, a legend layer, a colorbar, a title and a subtitle. It is authored, then updated in a fresh process without Matplotlib, Cartopy, pyproj or shapely: new grid values with `vmin`/`vmax` changed from −10/35 to −15/40 (the colorbar is redrawn and nothing is stale), new polygons, and a new title and subtitle. Against Cartopy drawing the same updated figure, **0.44 % of pixels differ by more than 32 levels and 2.55 % by more than 8**, from `pcolormesh` seams, polygon edges and text anti-aliasing. The test's tolerances are 0.6 % and 3 %.
+  - **Authored grid file with a colorbar layer** (1.35 MB, 5 layers): unchanged accuracy against its full render (more than 32 levels off: 0.099 %). `replace_grid` takes 3.3 ms with the same normalisation and 5.5 ms with a new one, so a colorbar redraw costs about 2.3 ms. Speed in the report: grid cold 134 ms (120×), warm 27 ms (10.0×).
+- **Decisions/deviations:**
+  - The redraw is stored as parts plus Matplotlib's tick rules, rather than as a generic vector description. This is exact for Matplotlib's default colorbars, and other locators or formatters fall back to a static colorbar.
+  - The runtime refuses offset/scientific labels instead of approximating them.
+  - The axis label moves in whole pixels.
+- **Remaining/blockers:** none. The build-to-runtime milestone (after 11) is met.
+- **Next:** Session 12. Measure load and decode as a share of a cold product from the current report and decide on lazy decoding. Define archive lifetime and close behaviour, and cache encoded bytes at save (colorbar redraw members included).
+
+### 2026-10-09 — Session 12 — completed
+
+- **Lazy decoding: measured, not adopted (no-change decision).**
+  - From report `report-20261009T193920Z/` (authored files), the load step, which includes decoding every layer, takes 13.1 of 318 ms (4.1 %) for a cold QPF product, 7.4 of 133 ms (5.6 %) for a cold grid product, and 0.5–3.3 % in the loops. All are below the 10 % gate.
+  - Profiling `Scene.load` on the QPF file in a warm process (8.3 ms) shows zlib decompression at 6.7 ms (the same work as the prototype), buffer ownership copies at 0.7 ms, and SHA-256 plus manifest validation under 1 ms. The rest of the 13 ms cold figure is one-time start-up of the load path.
+  - Lazy decoding stays in the extension backlog, whose row now records these numbers. The Session 13 checkbox about lazy/eager guarantees is marked not applicable.
+- **Work:**
+  - **Archive lifetime** is defined (the `Scene` docstring, `Scene.close`, `docs/format.md` §2): `Scene.load` reads, verifies and decodes everything and closes the file before returning. A scene holds no open file and stays usable after `close()` and after its file is moved, deleted or replaced, including by saving over it. `close()` and the context manager release nothing; they exist so code keeps working if a later version loads lazily.
+  - **Save-time encode cache** (`scene._ENCODE_CACHE`): encoded bytes are kept per read-only buffer, by identity, while the buffer lives. Owned buffers are immutable, so a save re-encodes only buffers that are new since they were loaded or last saved. This covers layer pixels, index maps, LUTs and colorbar redraw members, closing the Session 07 deferral. Entries are removed by a weakref callback when their buffer is freed.
+  - **Compositor first-render fast path** (the cold cost noted in Session 08b): when the bottom layer covers the whole canvas at full opacity, the canvas starts from its pixels, with fully transparent pixels zeroed, instead of compositing it onto a transparent canvas. The result is identical to `alpha_composite`, which a test checks. The first render of the authored QPF file in a fresh process fell from 17.7 to 13.0 ms (median of 7).
+  - **Pre-flattened static runs:** no new file member. `SceneBuilder` already writes each static run, whether a zorder band or an artist group, as one raster, as Session 02 decided, and the compositor caches multi-layer runs at runtime. A stored flattened copy would only duplicate pixels.
+  - **Tests:**
+    - `tests/test_lifecycle.py` (6): no file descriptors left open by five loads; scenes usable after `close()` and after their file is deleted; saving over the source file; repeated saves encode nothing new, then exactly the replaced pixels once, then the new LUT and grid pixels once, with byte-identical repeat saves; another encoding is encoded once; cache entries go away with their buffers.
+    - `tests/test_compositor.py`: the fast path's exactness with transparent pixels that carry colour, at full and half opacity, at the origin and offset; the flattening spy now expects no `_over` for a full-canvas bottom layer.
+- **Verification:**
+  - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 20 files, both environments), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+  - `uv run pytest`: **366 passed, 73 skipped** core-only. **460 passed** with `--extra build`. **366 passed, 73 skipped** on Python 3.12.15 with NumPy 2.0.0 and Pillow 10.1.0. The environment was restored to core only.
+  - `package_qpf.py --scene` → `package-qpf-20261009T193907Z/`; `package_grid.py --scene` → `package-grid-20261009T193917Z/`; `report.py` → `report-20261009T193920Z/`.
+- **Evidence (cold-process load versus Session 02, medians):**
+
+  | | Prototype (Session 02) | Package (Session 12) |
+  | --- | --- | --- |
+  | QPF load | 9.3 ms (2.8 % of 334 ms) | 13.1 ms (4.1 % of 318 ms) |
+  | Grid load | 5.6 ms (4.6 % of 123 ms) | 7.4 ms (5.6 % of 133 ms) |
+
+  Speed in the report: QPF 37.5× cold (318 ms), 10.7× for the 18-product loop (2.58 s) and 7.5× per product (123 ms); grid 121× cold (133 ms) and 10.1× warm (27 ms). Cold QPF varies between 286 and 318 ms from run to run.
+- **Remaining/blockers:** none.
+- **Next:** Session 13. Write and run the fresh-environment procedure: author with the build extra, then in a core-only venv outside the source tree, with sources moved away and the network blocked, load, update, render and compare.
+
+### 2026-10-09 — Session 13 — completed
+
+- **Work:**
+  - **`scripts/check_portability.py`** (standard library only; runs each stage in its own process; procedure in `CONTRIBUTING.md` → "Environment checks"):
+    1. Authors the QPF and grid scenes with the build extra, then exports the runtime inputs as plain NumPy files.
+    2. Builds the wheel and installs it into a new core-only venv outside the repository.
+    3. Renames `benchmarks/data` away, always restoring it, and points `HOME` into the sandbox so the Cartopy Natural Earth cache is unreachable without being touched.
+    4. Runs the runtime with `python -I` and an audit hook that logs every opened file and refuses network calls: all 18 QPF products, 4 grid variants, a normalisation change with colorbar redraw, an added layer, then save, reload and re-render.
+    5. Compares the PNGs with the development environment and with the full Cartopy renders.
+  - **`tests/test_portability.py`** (2): the same no-outside-files and no-network rule in a fresh process on every test run. Its negative control shows the hook flags both a stray read of `README.md` and a connection attempt.
+  - **Pre-check:** the audit hook was also checked by hand against the core venv. With a stray read and a socket connect added, it reported the stray read as outside the allowed roots and logged `socket.getaddrinfo` as a refused network call.
+  - **Lazy decoding:** not applicable, as Session 12 kept eager loading. The no-open-file guarantee is in `tests/test_lifecycle.py`.
+- **Verification:**
+  - **Full procedure:** `uv run scripts/check_portability.py` produced `authored-20261009T194750Z/` and `portability-20261009T194750Z/`.
+    - The core venv ran Python 3.13.4 with only `cartostack`, `numpy` 2.5.3 and `pillow` 12.3.0 installed.
+    - All 8 checks pass: no build library installed or imported (including pyproj and shapely); no file opened outside the sandbox, the venv and the Python installation (498 files opened); no network attempt; cartostack imported from the venv; reload identical; no stale colorbar; all 25 PNGs pixel-identical to the development environment.
+    - Against full Cartopy renders: QPF median over the 18 products is 0.069 % of pixels > 8 and 0.000 % > 32; grid median over the 4 variants is 2.20 % > 8 and 0.099 % > 32. The QPF figures match Session 12.
+    - `benchmarks/data` was restored afterwards.
+  - **Checks:** `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 20 files, both environments), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+  - **Tests:**
+    - core-only: 368 passed, 73 skipped
+    - with `--extra build`: 462 passed
+    - lowest allowed dependencies (Python 3.12.15, NumPy 2.0.0, Pillow 10.1.0): 368 passed, 73 skipped
+    - `uv run --isolated --python 3.12` and `--python 3.14`: 368 passed, 73 skipped
+    - The environment was restored to core only.
+- **Remaining/blockers:** none.
+- **Next:** Session 14, end-to-end examples and the public API documentation.
+
+### 2026-10-09 — Session 14 — completed
+
+- **Examples (`examples/`, guide in `examples/README.md`):**
+  - **`author_grid.py`** (build extra): a standalone New York State temperature map drawn with `SceneBuilder.new` and local Natural Earth shapefiles. It writes `grid.cstack` with five layers: below, a `temperature` grid slot, above, a redrawable `colorbar` and a `subtitle` text slot. It also writes 4 sample `.npy` inputs.
+  - **`author_qpf.py`** (PEP 723, adds GeoPandas): wraps the unchanged figure from `benchmarks/baseline_qpf.py`, the port of the production script, which is the primary authoring path.
+  - **`update_grid.py`** (runtime only): cron-style; loads once, then replaces the grid and subtitle per input and writes a PNG. `--vmin`/`--vmax` change the range and redraw the colorbar.
+  - **`update_qpf.py`** (runtime only): renders all WPC QPF product directories in one process.
+  - **`wpc_qpf.py`**: a shapefile and dBASE reader that uses only the standard library and NumPy.
+  - Both authoring scripts create the output's parent folder, and `update_qpf.py` adds its own folder to `sys.path`, so they work with the documented `out/...` paths and under `python -I`. Both were bugs found while verifying.
+  - `/out/` is gitignored for example output.
+- **Documentation:**
+  - **`README.md`** was replaced by a short user-facing page: purpose, the speed figure (`docs/images/speedup_summary.png`, copied from `report-20261009T193920Z`) with the report's numbers, installation of the core runtime versus the `build` extra, a two-step quickstart, what a file can hold, and a table of the documents.
+  - **`docs/design.md`** holds the full former README (1,886 lines) unchanged, under a header saying where the implemented API is documented; its relative links were fixed.
+  - **`docs/api.md`** (new) covers installation, the runtime `Scene` (loading, saving and lifetime; data slots; layer editing; output; layer types; errors), `SceneBuilder`, embedded fonts and licensing, and the format 1.0 limitations.
+  - `CONTRIBUTING.md`, the `SESSIONS.md` preamble and workflow, the development commands (examples added) and `CLAUDE.md` (repository state rewritten for the implemented package; README references now point to `docs/design.md`) are all reconciled.
+- **Fix found while documenting limitations:** `SceneBuilder.add_grid_slot(norm=...)` used only `norm.vmin`/`vmax`. A `LogNorm`, `BoundaryNorm`, `TwoSlopeNorm` or `Normalize(clip=True)` would therefore have been stored as a linear range and given wrong colours without any error. It now raises `BuildError` unless the norm is exactly a `Normalize` without clip. The new test `test_grid_slots_refuse_norms_they_cannot_reproduce` covers all four cases plus the accepted case.
+- **Tests:** `tests/test_examples.py` (2). It runs `update_grid.py` and `update_qpf.py` in fresh processes, as `python examples/<script>` would. Each must import none of Matplotlib, Cartopy, pyproj, shapely, GeoPandas or pyogrio, and every PNG must be pixel-identical to the same updates made in process. The grid test includes a `--vmin`/`--vmax` change; the QPF test (fixtures marker) uses two real WPC products. The test scene embeds Pillow's bundled font.
+- **Verification:**
+  - **Examples from the source tree:**
+    - `author_grid.py` produces a 1200×900, 5-layer file. `author_qpf.py` produces a 2210×1848 file with layers below, qpf, above and subtitle.
+    - `update_qpf.py` renders the 18 products in 2.45 s. All 18 PNGs are pixel-identical to the Session 13 core-environment renders in `portability-20261009T194750Z/out-core`.
+    - `update_grid.py` renders 4 inputs in 0.12 s, and a new 0–40 °C range with the colorbar redrawn. I inspected the rendered grid and QPF maps by eye.
+  - **Examples from an installed wheel:**
+    - The wheel came from `uv build --wheel`. Authoring used a venv with `cartostack[build]` from the wheel; the updates used a core-only venv holding exactly `cartostack`, `numpy` 2.5.3 and `pillow` 12.3.0, in which none of Matplotlib, Cartopy, pyproj, shapely or GeoPandas can be found.
+    - Everything ran from a sandbox outside the repository with `python -I` and `env -i`, and `cartostack` was imported from the venv's site-packages.
+    - `author_grid.py` wrote the file, then `update_grid.py` (4 products in 0.32 s) and `update_qpf.py` (18 products in 2.47 s) ran in the core venv. All 22 PNGs are pixel-identical to the source-tree run.
+  - **Checks:**
+    - `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 20 files), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass.
+    - `uv run --extra build mypy --strict examples --ignore-missing-imports` passes, after fixing 3 annotation gaps.
+    - All relative links in `README.md`, `docs/api.md`, `docs/design.md`, `examples/README.md` and `CONTRIBUTING.md` resolve.
+  - **Tests:**
+    - with `--extra build`: 468 passed
+    - core-only: 370 passed, 73 skipped
+    - lowest allowed dependencies (Python 3.12.15, NumPy 2.0.0, Pillow 10.1.0): 370 passed, 73 skipped
+    - `uv run --isolated --python 3.12` and `--python 3.14`: 370 passed, 73 skipped
+    - The environment was restored to core only.
+- **Remaining/blockers:** none for Session 14. Two items for Session 15: the `[project.urls]` repository URL still names `GeoScene`, and the README image needs an absolute URL or packaging to render on PyPI.
+- **Next:** Session 15, distribution validation and v0.1 readiness.
+
+### 2026-10-09 — Session 15 — completed
+
+- **Verdict: v0.1 is release-ready, pending maintainer actions.**
+  - Sessions 00–14 are all `completed`. The artifacts build and pass `twine check`. Tests pass from the sdist against the installed wheel on every supported Python, core-only and with the build extra, at both the latest and the lowest allowed dependencies. The examples run from the installed wheel outside the repository, on macOS and in Linux containers.
+  - Remaining actions are in `CONTRIBUTING.md` → "Releasing": commit, merge to `main` and push (the PyPI description's image and links point at `main`, which does not have them yet); set the version (still `0.0.1.dev0`) and classifier; publish to TestPyPI, then PyPI; tag. **Publishing requires a separate user request; nothing was committed or published.**
+- **Fixes and changes:**
+  - **Build-extra floors raised to what was verified:**
+    - `matplotlib>=3.11.1`: with 3.11.0, `test_authored_colorbar_redraw_matches_matplotlib[horizontal|vertical]` fail, because 3.11.0 draws colorbars differently from what the runtime redraws.
+    - `cartopy>=0.26`: with 0.25.0, `test_control_points_match_cartopy_and_pyproj` (up to 13 px), the fresh-process authored-file test and `test_build_to_runtime_milestone` fail; one build gave `rendered 600x459 px, expected 600x460`.
+    - `SceneBuilder` now checks major.minor.patch (it compared only major.minor) and refuses 3.11.0, including release candidates. New tests: `test_matplotlib_below_the_verified_minimum_is_refused` (3) and `test_matplotlib_from_the_verified_minimum_is_accepted` (3, including dev versions).
+    - The Cartopy 0.25 root cause was not investigated: no version before 0.26 had ever been tested.
+  - **`pyproject.toml`:**
+    - `[project.urls]` now points to `dvanhoesen/CartoStack` (it named `GeoScene`), plus Documentation and Format-specification links.
+    - The sdist now includes `examples/`, which `tests/test_examples.py` needs; without it, tests run from the sdist would have failed. It also includes `docs/api.md`, `docs/format.md`, `docs/examples/`, `docs/images/` and `CONTRIBUTING.md`.
+    - The PyPI description is generated by `hatch-fancy-pypi-readme`, a new build requirement. It makes the README's relative links absolute and points the image at `raw.githubusercontent.com/.../main/`.
+    - `uv lock` was updated.
+  - **Determinism wording** (`docs/format.md` §2, `docs/api.md`, `README.md`): saves are byte-identical for a given zlib. Linux (zlib 1.3.1) and macOS (zlib 1.2.12) give different PNG bytes but identical pixels.
+  - **`package_qpf.py`/`package_grid.py`** record which `cartostack` ran (`package_origin()`: source tree or installed package, with version, file and interpreter) in `results.json` and the `bench.json` notes, and document running them with an installed wheel.
+  - **`README.md`:** speed figure and table from the release report, a run-to-run variance note, and a status line.
+  - **`CONTRIBUTING.md`:** the lowest-build-extra environment check and a new "Releasing" section.
+- **Verification:**
+  - **Artifacts** (`uv build`; the wheel is built from the sdist):
+    - `uvx twine check`: both PASSED.
+    - The wheel holds 26 files: `cartostack/` with `build/`, `schemas/manifest-1.schema.json` and `py.typed`, plus dist-info and LICENSE.
+    - Metadata: Requires-Python `>=3.12`; `numpy>=2.0`, `pillow>=10.1`; extra `build` (`matplotlib>=3.11.1`, `cartopy>=0.26`); License-Expression MIT; `text/markdown` with no relative links left.
+    - The sdist has no `benchmarks/`, `resources/`, `.cstack` files or `CLAUDE.md`.
+  - **Matrix** (fresh venvs; the wheel installed; tests run from the unpacked sdist with `CARTOSTACK_FIXTURE_DIR`, so they import site-packages, not `src/`):
+    - core on Python 3.12.15, 3.13.4 and 3.14.8 (NumPy 2.5.3, Pillow 12.3.0): 369 passed, 74 skipped each
+    - `build` extra on 3.12, 3.13 and 3.14 (Matplotlib 3.11.2, Cartopy 0.26.0): 473 passed, 1 skipped each
+    - lowest core on 3.12 (NumPy 2.0.2, Pillow 10.1.0): 369 passed, 74 skipped
+    - lowest build on 3.12 (plus Matplotlib 3.11.1, Cartopy 0.26.0): 473 passed, 1 skipped
+    - The one extra skip in every sdist run is the `.gitignore` regression test, which needs a git checkout.
+  - **Examples from the installed wheel outside the repository:**
+    - `author_grid.py` (build venv), then `update_grid.py` (4 products in 0.11 s) and `update_qpf.py` (18 products in 2.5 s) in core venvs on 3.12 and 3.14, with `python -I` and `env -i`.
+    - All 22 PNGs are identical between 3.12 and 3.14 and to the Session 14 run.
+    - Authored with Matplotlib 3.11.1 and updated with NumPy 2.0.2 and Pillow 10.1.0, the 4 grid PNGs are identical to the latest-version run.
+  - **Linux smoke test:** Docker via Colima, started for this check and stopped afterwards, Linux 6.8 aarch64 with glibc 2.41. In `python:3.12-slim` and `python:3.14-slim` with the wheel and fixtures mounted read-only: 369 passed, 74 skipped; the examples ran (18 QPF products in 3.8–4.2 s in the VM). All 22 PNGs are pixel-identical to macOS; the bytes differ only because of zlib. Staging and logs are in `benchmarks/results/linux-smoke-20261009T205407Z/`.
+  - **Release benchmark from the installed wheel** (3.13 core venv, authored files `authored-20261009T194750Z`): `package-qpf-20261009T205553Z`, `package-grid-20261009T205602Z` and `report-20261009T205609Z`.
+    - QPF: 40.6× cold (11.93 s → 294 ms), 10.6× for the 18-product loop (27.62 s → 2.61 s), 7.2× per product (923 → 128 ms); accuracy unchanged (0.069 % of pixels > 8, 0.000 % > 32).
+    - Grid: 112× cold (16.11 s → 144 ms), 9.6× warm (269 → 28 ms).
+    - These are within run-to-run variation of Session 12 (QPF cold 286–318 ms).
+    - The report's reconciliation prints one MISMATCH, which predates this session (it is in `report-20261009T193920Z` too): the Session 02 log quotes 0.156 s for the prototype QPF per-product median of 0.1567 s. The historical log entry is left as written.
+  - **Distribution names:** `https://pypi.org/pypi/cartostack/json` returned 404 (unregistered), as did TestPyPI and `carto-stack`. `github.com/dvanhoesen/CartoStack` is public (200). The README image URL on `main` returns 404 until the work is pushed to `main`.
+  - **Repository checks:** `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` (strict, 20 files), `uv lock --check` and `uvx ruff check --line-length 120 benchmarks/` pass. Project environment: 474 passed with `--extra build`, then restored to core: 370 passed, 73 skipped.
+- **Unverified or unsupported environments (explicit):**
+  - Windows (any), Linux x86_64 and macOS x86_64: no machine available.
+  - Linux was tested on arm64 only, and without the build extra.
+  - NumPy 2.0 and Pillow 10.1 on Python 3.14: neither publishes 3.14 wheels and the source builds failed, so on 3.14 the effective minimum is the oldest version with 3.14 wheels; pip picks it automatically. Not encoded as markers.
+  - Cartopy < 0.26 and Matplotlib < 3.11.1: unsupported (floors raised).
+- **Remaining/blockers:** none for Session 15. Release actions await the user.
+- **Next:** Session 16, workload profiling and the next extension decision. Or, at the user's request, the release steps in `CONTRIBUTING.md` → "Releasing".

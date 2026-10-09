@@ -51,3 +51,18 @@ def test_build_extra_is_importable_but_not_imported() -> None:
 def test_network_is_blocked() -> None:
     with pytest.raises(OSError, match="network access is disabled"):
         socket.create_connection(("example.com", 80), timeout=1)
+
+
+def test_no_package_source_is_gitignored() -> None:
+    """Hatchling builds honour .gitignore: an ignored module would be missing from the wheel."""
+    import shutil
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    if shutil.which("git") is None or not (root / ".git").exists():
+        pytest.skip("not a git checkout")
+    files = [str(p.relative_to(root)) for p in (root / "src" / "cartostack").rglob("*")
+             if p.is_file() and "__pycache__" not in p.parts]  # fmt: skip
+    out = subprocess.run(["git", "check-ignore", "--no-index", *files], cwd=root,
+                         capture_output=True, text=True, check=False)  # fmt: skip
+    assert out.stdout.strip() == "", f"ignored package files: {out.stdout.split()}"

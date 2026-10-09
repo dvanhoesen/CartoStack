@@ -411,6 +411,207 @@
                 "properties": {
                   "slot": {
                     "$ref": "#/$defs/id"
+                  },
+                  "redraw": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "required": [
+                      "orientation",
+                      "box",
+                      "rows",
+                      "ticks",
+                      "labels"
+                    ],
+                    "properties": {
+                      "orientation": {
+                        "enum": [
+                          "horizontal",
+                          "vertical"
+                        ]
+                      },
+                      "box": {
+                        "type": "array",
+                        "items": {
+                          "type": "number"
+                        },
+                        "minItems": 4,
+                        "maxItems": 4
+                      },
+                      "rows": {
+                        "type": "object",
+                        "required": [
+                          "member",
+                          "encoding",
+                          "n_colors"
+                        ],
+                        "properties": {
+                          "member": {
+                            "type": "string"
+                          },
+                          "encoding": {
+                            "type": "string"
+                          },
+                          "n_colors": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        }
+                      },
+                      "under": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "member",
+                              "encoding"
+                            ],
+                            "properties": {
+                              "member": {
+                                "type": "string"
+                              },
+                              "encoding": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "over": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "member",
+                              "encoding"
+                            ],
+                            "properties": {
+                              "member": {
+                                "type": "string"
+                              },
+                              "encoding": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "ticks": {
+                        "type": "object",
+                        "required": [
+                          "length",
+                          "width"
+                        ],
+                        "properties": {
+                          "locator": {
+                            "enum": [
+                              "auto",
+                              "fixed"
+                            ]
+                          },
+                          "nbins": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "steps": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          },
+                          "side": {
+                            "enum": [
+                              "bottom",
+                              "top",
+                              "left",
+                              "right"
+                            ]
+                          },
+                          "direction": {
+                            "enum": [
+                              "out",
+                              "in",
+                              "inout"
+                            ]
+                          },
+                          "length": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "width": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "color": {
+                            "$ref": "#/$defs/color"
+                          }
+                        }
+                      },
+                      "labels": {
+                        "type": "object",
+                        "required": [
+                          "font",
+                          "size_px"
+                        ],
+                        "properties": {
+                          "font": {
+                            "type": "string"
+                          },
+                          "size_px": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "color": {
+                            "$ref": "#/$defs/color"
+                          },
+                          "pad": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "minus": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "label": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "member",
+                              "encoding"
+                            ],
+                            "properties": {
+                              "member": {
+                                "type": "string"
+                              },
+                              "encoding": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "label_edge": {
+                        "type": "number"
+                      }
+                    }
                   }
                 }
               }
@@ -680,7 +881,8 @@
                       "top",
                       "center",
                       "baseline",
-                      "bottom"
+                      "bottom",
+                      "center_baseline"
                     ]
                   },
                   "layout": {
