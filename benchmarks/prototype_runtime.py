@@ -7,7 +7,7 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 02: NumPy/Pillow-only runtime for the prototype layered files.
+"""NumPy/Pillow-only runtime for the prototype layered files.
 
 Loads a prototype ``.cstack`` written by ``prototype_build.py``, swaps in new
 data (QPF polygons or grid values) and a new subtitle, stacks the layers, and

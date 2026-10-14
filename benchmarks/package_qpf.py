@@ -1,6 +1,6 @@
-"""Session 08b: the QPF workload on the ``cartostack`` package, in fresh processes.
+"""The QPF workload on the ``cartostack`` package, in fresh processes.
 
-Builds format 1.0 QPF scenes from the latest Session 02 prototype build (its static
+Builds format 1.0 QPF scenes from the latest prototype build (its static
 layers, the WPC bin table, and the embedded font), one per polygon supersampling
 factor, and saves them as ``.cstack``. Fresh child processes then load a scene and,
 per product, read the WPC shapefile (the prototype's NumPy reader, timed as input),
@@ -11,13 +11,13 @@ an RGBA PNG at level 6, as the Cartopy baseline writes it.
 * cold: Day 1-3 alone, one product per process (``--cold-runs``, default 5);
 * loop: all 18 products in one process (``--loop-runs`` for the default factor, one run
   for the others), PNGs kept and compared with each product's own Cartopy render
-  (Session 01b) using the Session 02 comparison's regions.
+  (``baseline_qpf.py``) using the prototype comparison's regions.
 
 Children assert that matplotlib, cartopy, pyproj, shapely, geopandas, pyogrio and
 pandas are never imported. Runs in the project environment:
 
     uv run python benchmarks/package_qpf.py [--supersample 4 --compare 1,2]
-    <venv>/bin/python benchmarks/package_qpf.py --scene ...   # an installed wheel (Session 15)
+    <venv>/bin/python benchmarks/package_qpf.py --scene ...   # an installed wheel
 
 Writes ``benchmarks/results/package-qpf-<UTC stamp>/``: ``bench.json`` (schema
 ``cartostack-bench/1``, read by ``benchmarks/report.py``), ``results.json`` (every run),
@@ -192,7 +192,7 @@ def accuracy(build: Path, outdir: Path, reference: Path, days: list[str]) -> dic
 
 
 def package_origin() -> dict:
-    """Which cartostack ran: the source tree (``uv run``) or an installed wheel (Session 15)."""
+    """Which cartostack ran: the source tree (``uv run``) or an installed wheel."""
     import cartostack
     path = Path(cartostack.__file__).resolve()
     where = "source tree" if (ROOT / "src") in path.parents else "installed package"
@@ -235,7 +235,7 @@ def main() -> None:
     parser.add_argument("--scene", type=Path,
                         help="an authored .cstack (author_scenes.py) instead of scenes from the prototype layers")
     parser.add_argument("--reference", type=Path,
-                        help="Session 01b products directory (default: latest qpf-*/products)")
+                        help="baseline_qpf.py products directory (default: latest qpf-*/products)")
     parser.add_argument("--supersample", type=int, default=4, help="default polygon supersampling")
     parser.add_argument("--compare", default="1,2", help="other factors, one loop run each")
     parser.add_argument("--cold-runs", type=int, default=5)

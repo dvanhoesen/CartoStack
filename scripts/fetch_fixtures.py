@@ -111,7 +111,7 @@ NE_URLS = [
     "https://naturalearth.s3.amazonaws.com/10m_{category}/ne_10m_{name}.zip",
 ]
 
-# SHA-256 recorded in SESSIONS.md → Environment for the user-supplied fixture.
+# Expected SHA-256 of the user-supplied fixture.
 COUNTY_SHA256 = {
     "NYS Counties.shp": "c3fdde4d0c7f6ef3194f6e92940ff82b93c219393e28f25c4b4cdf7c8ae2ed24",
     "NYS Counties.shx": "41d740903605db3223085e6ea0844e301f0f81ff2878acc3d90c8802ddf1e362",

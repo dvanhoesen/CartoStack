@@ -1,10 +1,10 @@
 # The `.cstack` file format, version 1.0
 
-Status: **1.0**, specified in Session 04 (2026-10-08). Reference implementation of the
-validation rules: `cartostack.geometry` and `cartostack.manifest`
-(`parse_manifest` / `validate_manifest`). Structural JSON Schema:
-`src/cartostack/schemas/manifest-1.schema.json` (`cartostack.manifest.load_schema()`).
-Examples: `docs/examples/*.manifest.json`.
+Status: **1.0**. Reference implementation of the validation rules: `cartostack.geometry`
+and `cartostack.manifest` (`parse_manifest` / `validate_manifest`). Structural JSON
+Schema: `src/cartostack/schemas/manifest-1.schema.json` (`cartostack.manifest.load_schema()`).
+Examples: `docs/examples/*.manifest.json` (`qpf` and `grid` describe real files;
+`minimal` is illustrative and its digest is a placeholder).
 
 A `.cstack` file is a layered map. It holds a stack of RGBA layers that share one canvas
 geometry, plus *slots*: layers whose pixels are regenerated at runtime from new data
@@ -51,7 +51,7 @@ A `.cstack` file is a ZIP archive (APPNOTE 6.3, no encryption, no multi-disk):
   referenced by any record MAY exist; readers ignore them.
 - Writers SHOULD write atomically (temporary file, then rename), so a failed save never
   corrupts an existing file.
-- The reference writer (`Scene.save`, Session 05) is also **deterministic**:
+- The reference writer (`Scene.save`) is also **deterministic**:
   - members go in a fixed order (`mimetype`, `manifest.json`, then the others sorted by
     name) with timestamp 1980-01-01 00:00, Unix attributes `0644`, and manifest JSON
     written with a 2-space indent;
@@ -59,16 +59,15 @@ A `.cstack` file is a ZIP archive (APPNOTE 6.3, no encryption, no multi-disk):
 
   Saving the same scene twice, or loading and re-saving a file it wrote, gives identical
   bytes. Newly encoded members are compressed by the zlib that Python and Pillow link, so
-  their bytes (never their decoded pixels) can differ between zlib versions. Session 15
-  found this between macOS (zlib 1.2.12) and Linux (1.3.1). It preserves unknown fields at the manifest's top level, in `geometry`, in layer
-  records, and in their kind sections.
+  their bytes (never their decoded pixels) can differ between zlib versions (for example
+  zlib 1.2.12 on macOS and 1.3.1 on Linux). The writer preserves unknown fields at the
+  manifest's top level, in `geometry`, in layer records, and in their kind sections.
 - **Lifetime (reference runtime).** `Scene.load` reads, verifies and decodes every member,
   then closes the file before returning. A loaded scene holds no open file. The file may be
   moved, deleted, or replaced, including by saving over it, and `Scene.close()` releases
   nothing. A save re-encodes only pixels that are new since they were loaded or last saved.
-  Lazy decoding was measured and not adopted (Session 12): load and decode take at most
-  5.6 % of a one-product run (7.4 of 133 ms for the grid scene, 13.1 of 318 ms for QPF),
-  below the 10 % threshold.
+  Decoding is not lazy, because load and decode take at most 5.6 % of a one-product run (7.4 of 133 ms for the grid scene, 13.1 of 318 ms for QPF),
+  too little to be worth deferring.
 
 ## 3. Versions and compatibility
 
@@ -239,8 +238,8 @@ its alpha by `opacity` and composite it source-over (Porter–Duff, straight alp
 `(left, top)`; parts outside the canvas are discarded. The scaled alpha is
 `floor(alpha · opacity + 0.5)`; colour channels are unchanged. The reference operator is
 Pillow's `Image.alpha_composite`. Implementations MAY differ from it and from a
-single-canvas Matplotlib render by rounding. Session 02 measured at most 3–5 levels per
-channel when stacking Agg-rendered layers.
+single-canvas Matplotlib render by rounding: stacking Agg-rendered layers differs by at
+most 3–5 levels per channel.
 
 Placement clipping to the canvas is separate from map clipping (§5.3): raster and colorbar
 pixels are composited wherever they fall on the canvas, inside or outside the axes.
@@ -268,14 +267,14 @@ unchanged by that.
 | `i32le` | raw little-endian `int32`, `height × width × 4` bytes | grid index maps |
 
 The decoded shape MUST match the record (`width`, `height`). Writers SHOULD use the
-defaults. In Session 02, `rgba8+zlib` gave the smallest files and decoded in about 4 ms per
+defaults: `rgba8+zlib` gives the smallest files and decodes in about 4 ms per
 4-megapixel layer.
 
 ## 7. Raster and colorbar layers
 
 `raster`: pre-rendered pixels. `member` and `encoding` are REQUIRED. Contiguous runs of
-static content SHOULD be stored pre-flattened into one raster layer (Session 02: half the
-stacking and load time, and closer to the single-canvas render). Store them separately only
+static content SHOULD be stored pre-flattened into one raster layer (this halves stacking and
+load time, and is closer to the single-canvas render). Store them separately only
 when they must be shown, hidden, or reordered independently.
 
 `colorbar`: a raster layer (same requirements) that shows a grid slot's colour scale. It
@@ -330,7 +329,7 @@ A redraw composites, in order:
 are `ScalarFormatter`'s: `%1.Nf` with the fewest decimals that keep the labels exact to
 1/1000 of the range, with `minus` replacing `-`. When `ScalarFormatter` would show an
 offset or a power-of-ten multiplier (for example `1e6` or `+1000`), the runtime MUST NOT
-redraw. The colorbar stays stale instead. Session 11 checked the locator and formatter
+redraw. The colorbar stays stale instead. The locator and formatter were checked
 against Matplotlib 3.11.2 on 1,500 random ranges; every tick and label was identical.
 
 ## 8. Grid slots
@@ -364,8 +363,8 @@ map says which grid cell each pixel shows.
   converted to `value_dtype` (default `float32`); NaN and masked values are *bad*.
   1. `x = value − vmin`, then `x = x / (vmax − vmin)`. Each step is computed in float64
      and rounded to `value_dtype`, as Matplotlib's in-place NumPy arithmetic does.
-     Computing in float32 throughout gives different results for many ranges (Session 08
-     measured 55–100 % of values differing for ranges such as 0.1–0.7 or 250.15–310.7).
+     Computing in float32 throughout gives different results for many ranges
+     (55–100 % of values differ for ranges such as 0.1–0.7 or 250.15–310.7).
   2. `x = x · n_colors` in `value_dtype`; where `x == n_colors`, set `x = n_colors − 1`.
   3. The row is `under` (`n_colors`) if `x < 0`, `over` (`n_colors + 1`) if
      `x ≥ n_colors`, `bad` (`n_colors + 2`) if the value is bad, otherwise `trunc(x)`.
@@ -379,7 +378,7 @@ map says which grid cell each pixel shows.
   `neither`) only affects colorbars; `under` and `over` colours are always applied.
   Writers authoring from Matplotlib SHOULD store `round(c · 255)` per channel, as Agg
   rounds colours when it draws a mesh, rather than `cmap(..., bytes=True)`, which
-  truncates (Session 10: truncation put most pixels one level off the rendered map).
+  truncates (truncation puts most pixels one level off the rendered map).
 - Pixels with index `−1` are transparent.
 - **Runtime changes.** A runtime MAY change `vmin`, `vmax`, and the LUT (including
   `n_colors`) when it supplies new values; a saved file then records the new `norm` and
@@ -438,7 +437,7 @@ example WPC QPF contours. It requires `geometry.georeference` with a supported p
   fully transparent layer. `k = 1` gives hard edges.
 - **Choosing `k`.** Writers SHOULD use `supersample: 4` for maps compared with
   Matplotlib/Cartopy output. The reference runtime's exact fill, on all 18 WPC QPF
-  products of Session 01b (2210 × 1848, measured in Session 08b on an Apple M3 Pro), gives
+  products (2210 × 1848, measured on an Apple M3 Pro), gives
   these results. Fill times are medians over products 2–18 of one process, plus the heavy
   Day 1-7 product. The accuracy column is the share of clear-map pixels that differ from
   Cartopy's anti-aliased render by more than 32 levels.
@@ -450,9 +449,9 @@ example WPC QPF contours. It requires `geometry.georeference` with a supported p
   | 4 | 45 ms | 148 ms | 0.000 %; 0–0.001 % |
 
   Edge accuracy improves much faster than cost grows, because most of the cost is work at
-  pixel resolution. The Session 02 prototype's Pillow fill truncated vertices and filled
-  every pixel an edge touched, so it differed from this rule along every edge. Its 2×
-  default left 0.23 % of clear-map pixels more than 32 levels off.
+  pixel resolution. A Pillow polygon fill truncates vertices and fills
+  every pixel an edge touches, so it differs from this rule along every edge: at 2× it
+  leaves 0.23 % of clear-map pixels more than 32 levels off.
 - `member` (optional): current pixels, as for grids.
 
 ## 10. Text slots
@@ -502,7 +501,7 @@ Matplotlib's layout rule so it lines up with text authored in Matplotlib.
 - `member` (optional): the rendered pixels of the current `value`, placed at
   `left`/`top`.
 
-**Measured against Matplotlib 3.11.2 (Session 09).** DejaVu Sans, Oblique and Bold at
+**Measured against Matplotlib 3.11.2.** DejaVu Sans, Oblique and Bold at
 11–58 px, all four `va` values with `ha` left, center and right, fractional anchors,
 plain, kerned (`AVATAR To Ty Wo …`) and ligature (`office flight affine`) strings.
 Placement, measured as the shift of the ink's centre of mass, is within 0.02 px
@@ -542,32 +541,15 @@ checks everything in this document that can be checked from the manifest alone:
 - polygon slots having a supported projection;
 - placements intersecting the canvas.
 
-Member sizes and digests, and decoded shapes, are checked when reading the archive
-(Session 05). The JSON Schema checks structure only, so it accepts some manifests that
+Member sizes and digests, and decoded shapes, are checked when reading the archive.
+The JSON Schema checks structure only, so it accepts some manifests that
 `parse_manifest` rejects; the reverse should never happen.
 
-## 13. Review against the Session 02 prototype
-
-| Prototype manifest (`benchmarks/prototype_build.py`) | Format 1.0 |
-| --- | --- |
-| `format: "cartostack-prototype"`, `version: "0.0-session02"` | `format`, `format_version: "1.0"`, plus the `mimetype` member |
-| `canvas.width/height`, `save_dpi`, `figsize_in`, `crop_bbox_in` | `geometry.canvas` (`dpi` = save DPI), `geometry.figure` (`crop_in`) |
-| (resolved axes only in benchmark results) | `geometry.axes`, checked against the georeference |
-| `georef.lcc` (+ `proj4`), `georef.affine` | `georeference.projection` (`name: "lcc"`), `crs.proj4`, `world_to_pixel`, plus `projected_extent` |
-| `stack: [...]` with `slot:`/`text:` prefixes | `layers[]` with `kind` and `order` |
-| raster `encoding: zlib/raw/png`, per-layer `sha256` | `rgba8+zlib`/`rgba8`/`png`; digests in `members` |
-| `slots.qpf`: `ranges`, `colors`, `zorder`, `default`, `rounding`, `fill_rule`, `supersample` | `polygon.bins[]` (`lower`, `upper`, `color`, `order`), `fallback`, `round_decimals`, `fill_rule`, `supersample` |
-| `slots.grid`: `grid_shape`, `vmin`, `vmax`, `n_colors`, `lut_rows`, `alpha_u8`, `dtype`, `index_map`, `lut` | `grid.shape`, `norm`, `colormap` (`n_colors`, fixed under/over/bad rows), `alpha` (float; 8-bit rule in §8), `value_dtype`, `index_map` (`i32le+zlib`) |
-| `text_slots.subtitle`: `text`, `font`, `size_px`, `x`, `y`, `ha`, `va`, `color`, `snap`, `dy` | `text.value`, `font`, `size_px`, `x`, `y`, `ha`, `va`, `color`, `snap`, `offset: [0, dy]`, `layout`, `rotation` |
-
-`docs/examples/qpf.manifest.json` and `grid.manifest.json` are these two prototype files
-translated to 1.0. Their member sizes and digests are those of the prototype's real members
-under the new names. `minimal.manifest.json` is an illustrative non-georeferenced file
-whose `layers/background.png` digest is a placeholder.
+## 13. Future versions
 
 Deliberately left to later minor versions:
 
-- markers for flattened static runs and lazy-loading hints (Session 12);
+- markers for flattened static runs and lazy-loading hints;
 - `zstd` encodings, revisited when Python 3.14 is the minimum (stdlib `compression.zstd`);
 - text rotation;
 - further projections for polygon slots.

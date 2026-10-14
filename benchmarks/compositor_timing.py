@@ -1,6 +1,6 @@
-"""Session 06: compositing and PNG-encoding timing for the Session 01 grid and QPF scenes.
+"""Compositing and PNG-encoding timing for the grid and QPF reference scenes.
 
-Builds format 1.0 scenes from the latest Session 02 prototype build (its layer PNGs,
+Builds format 1.0 scenes from the latest prototype build (its layer PNGs,
 grid index map, LUT, and fonts), saves them as ``.cstack``, then times in-process:
 ``Scene.load``, the first render (flattening static runs), warm renders (reusing
 them), layer-by-layer renders (``flatten=False``), and PNG encoding. It also checks
@@ -126,7 +126,7 @@ def qpf_scene(build: Path, split: bool) -> Scene:
 
 
 def prototype_stack(scene: Scene) -> np.ndarray:
-    """Session 02's ``composite_pillow``: Pillow alpha_composite of every layer in order."""
+    """The prototype's ``composite_pillow``: Pillow alpha_composite of every layer in order."""
     order = [layer for layer in scene.draw_order() if layer.visible and layer.pixels is not None]
     img = Image.fromarray(np.array(order[0].pixels), "RGBA")
     for layer in order[1:]:

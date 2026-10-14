@@ -241,7 +241,5 @@ benchmarks/results/
 # Example output (examples/README.md)
 /out/
 
-# Detailed agent-facing README (local reference only)
-README_AGENTS.md
-CONTRIBUTING.md
-SESSIONS.md
+# Local reference copies of the original documentation
+reference/

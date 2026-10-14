@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Session 13: fresh-environment, source-independence and no-network check of the runtime.
+"""Fresh-environment, source-independence and no-network check of the runtime.
 
 Stages (each in its own process; this orchestrator needs only the standard library and
 ``uv``):
@@ -27,7 +27,7 @@ Stages (each in its own process; this orchestrator needs only the standard libra
    re-renders. It then checks ``sys.modules`` and the opened files: anything outside the
    sandbox, the venv and the Python installation fails.
 5. **Compare** (development environment): the runtime PNGs against the full Cartopy
-   renders (QPF: Session 01b products; grid: Session 02 references), and against the
+   renders (QPF: ``baseline_qpf.py`` products; grid: prototype references), and against the
    same updates rendered by the development environment (must be pixel-identical).
 
     uv run scripts/check_portability.py [--sandbox DIR] [--python 3.13]

@@ -15,8 +15,8 @@ Crop = tuple[float, float, float, float]  # x0, y0, width, height in inches, bot
 def resolve_crop(fig: Any, crop: str | Crop | None) -> Crop | None:
     """``"tight"`` → the figure's tight bounding box (resolved once, padding 0); else as given.
 
-    Saving with the resolved box is byte-identical to ``bbox_inches="tight"``
-    (Session 02), so the output size never drifts between builds.
+    Saving with the resolved box is byte-identical to ``bbox_inches="tight"``,
+    so the output size never drifts between builds.
     """
     if crop is None:
         return None

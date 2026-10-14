@@ -9,9 +9,9 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 01: conventional Cartopy baseline for the CartoStack reference scene.
+"""Conventional Cartopy baseline for the CartoStack reference scene.
 
-Draws the reference scene (SESSIONS.md → "Session 01 workload specification")
+Draws the reference scene (a 1200 × 800 px map with a synthetic temperature grid)
 the normal way with Matplotlib and Cartopy and measures it:
 
 * cold: fresh processes timing interpreter start, per-package imports, source
@@ -28,8 +28,8 @@ of downloading. Results go to ``benchmarks/results/<UTC timestamp>/``.
     uv run benchmarks/baseline_cartopy.py --variant 2    # other data/title inputs
     uv run benchmarks/baseline_cartopy.py --child render --out x.png   # one render
 
-The scene constants and ``render()`` are importable so Session 02 can produce
-full Cartopy references for updated inputs.
+The scene constants and ``render()`` are importable so the prototype benchmarks can
+produce full Cartopy references for updated inputs.
 """
 
 # Timestamps first, before any import beyond the two needed to take them.
@@ -58,7 +58,7 @@ NE = DATA / "shapefiles" / "natural_earth"
 COUNTIES = DATA / "NYS_Shoreline_Counties" / "NYS Counties.shp"
 PLACES = NE / "cultural" / "ne_10m_populated_places.shp"
 
-# --- Reference scene (Session 01 workload specification) -------------------
+# --- Reference scene -------------------------------------------------------
 
 WIDTH_PX, HEIGHT_PX, DPI = 1200, 800, 100
 FIGSIZE = (WIDTH_PX / DPI, HEIGHT_PX / DPI)
@@ -106,7 +106,7 @@ def make_field(variant: int = 0):
 
     Returns (lon, lat, values) with 1-D cell-centre coordinates and values of
     shape GRID_SHAPE. ``variant`` shifts the waves and the warm anomaly so
-    Session 02 can compare several updated inputs.
+    the benchmarks can compare several updated inputs.
     """
     import numpy as np
 
@@ -392,7 +392,7 @@ def render(sources, variant: int = 0, out: Path | None = None) -> dict:
 
 
 def scene_geometry(fig, ax, cax) -> dict:
-    """Resolved geometry after drawing: what Session 02 must reproduce."""
+    """Resolved geometry after drawing: what a layered file must reproduce."""
     width, height = fig.canvas.get_width_height()
 
     def px(bbox):

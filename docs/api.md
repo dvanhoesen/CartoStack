@@ -18,8 +18,7 @@ pip install cartostack            # runtime: NumPy ≥ 2.0, Pillow ≥ 10.1, Pyt
 pip install "cartostack[build]"   # authoring: adds Matplotlib ≥ 3.11.1 and Cartopy ≥ 0.26 (with pyproj)
 ```
 
-Runtime machines need only the first. From a checkout, use `uv sync` (core) or
-`uv sync --extra build` (with authoring).
+Runtime machines need only the first.
 
 ## Runtime: `cartostack.Scene`
 
@@ -42,7 +41,7 @@ returns it. An edit that fails raises an error and leaves the scene unchanged.
 | Call | Does |
 | --- | --- |
 | `Scene.load(path)` | Reads, verifies (SHA-256 of every member, the manifest schema, geometry) and decodes the whole file, then closes it. |
-| `scene.save(path, *, encoding=None)` | Writes atomically and deterministically: the same scene gives the same bytes (with the same zlib; other zlib versions may compress newly encoded pixels differently, never with different pixels). Only pixels that changed since loading or the last save are re-encoded. `encoding` overrides the layer encodings (`"rgba8+zlib"` or `"png"`). |
+| `scene.save(path, *, encoding=None)` | Writes atomically and deterministically: the same scene gives the same bytes. Only pixels that changed since loading or the last save are re-encoded. `encoding` overrides the layer encodings (`"rgba8+zlib"` or `"png"`). |
 | `scene.close()`, `with Scene.load(...) as scene:` | Releases nothing; the scene stays usable (see below). |
 | `scene.to_manifest()` | The manifest dict and member bytes `save` would write. |
 
@@ -160,6 +159,5 @@ before using another font.
 - **Colorbar redraw** needs Matplotlib's default locator (or fixed ticks) and a
   `ScalarFormatter`. Ranges that would need an offset or scientific notation leave the
   colorbar in `stale_colorbars`.
-- **Not yet built:** contour, point or vector slots; tiling; lazy loading (measured as
-  unnecessary in Session 12); native or GPU backends. These are in the backlog of
-  [design.md](design.md) and `SESSIONS.md`.
+- **Not yet supported:** contour, point or vector slots; tiling; native or GPU
+  backends. See [design.md](design.md) → "Future directions".

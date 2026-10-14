@@ -12,7 +12,7 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 02: author prototype layered files from the two reference scenes.
+"""Author prototype layered files from the two reference scenes.
 
 Builds each scene's figure with the baseline code (``baseline_qpf.build_figure``
 and ``baseline_cartopy.build_scene``), renders its draw groups into transparent
@@ -383,7 +383,7 @@ def write_cstack(scene: dict, encoding: str, path: Path, split: bool = False) ->
         texts[name] = {k: v for k, v in ts.items() if k != "font_path"}
     manifest = {
         "format": "cartostack-prototype",
-        "version": "0.0-session02",
+        "version": "0.0-prototype",
         "created_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "scene": scene["scene"],
         "canvas": scene["canvas"],

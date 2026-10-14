@@ -57,7 +57,7 @@ from .georef import Crop, canvas_geometry, display_to_canvas, resolve_crop
 from .index_map import grid_shape
 from .index_map import index_map as make_index_map
 
-# 3.11.1: text slots reproduce 3.11 text layout, and colorbar redraw matches 3.11.1+ (Session 15)
+# 3.11.1: text slots reproduce 3.11 text layout, and colorbar redraw matches 3.11.1+
 MIN_MATPLOTLIB = (3, 11, 1)
 
 

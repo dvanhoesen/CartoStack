@@ -1,7 +1,7 @@
-"""Session 08: the synthetic grid workload on the ``cartostack`` package, in fresh processes.
+"""The synthetic grid workload on the ``cartostack`` package, in fresh processes.
 
-Builds the Session 01 grid scene as a format 1.0 ``.cstack`` from the latest Session 02
-prototype build (``compositor_timing.grid_scene``: static layers, the 500 × 500 grid's
+Builds the reference grid scene as a format 1.0 ``.cstack`` from the latest prototype
+build (``compositor_timing.grid_scene``: static layers, the 500 × 500 grid's
 index map and coolwarm LUT, the subtitle text slot and its font). Fresh child processes
 load it and, per variant, generate the analytic field (``baseline_cartopy.make_field``,
 timed as input), call ``Scene.replace_grid``, set the subtitle (``scene.text``;
@@ -10,15 +10,15 @@ RGB PNG at level 6, as the Cartopy baseline writes it.
 
 * cold: variant 0 alone, one product per process (``--cold-runs``, default 5);
 * loop: variants 0-3 in one process (``--loop-runs``, default 2), PNGs compared with the
-  full Cartopy renders of the same variants (Session 02's ``ref_grid_variant_*.png``)
-  using the Session 02 comparison's regions;
+  full Cartopy renders of the same variants (the prototype's ``ref_grid_variant_*.png``)
+  using the prototype comparison's regions;
 * render timing, in this process: ``grids.render`` and ``Scene.replace_grid`` for the
   500 × 500 grid and an HRRR-sized 1799 × 1059 grid shown about one cell per pixel.
 
 Runs in the project environment:
 
     uv run python benchmarks/package_grid.py
-    <venv>/bin/python benchmarks/package_grid.py --scene ...   # an installed wheel (Session 15)
+    <venv>/bin/python benchmarks/package_grid.py --scene ...   # an installed wheel
 
 Writes ``benchmarks/results/package-grid-<UTC stamp>/``: ``bench.json`` (schema
 ``cartostack-bench/1``), ``results.json``, the scene, and the loop PNGs.

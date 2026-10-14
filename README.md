@@ -1,23 +1,14 @@
 # CartoStack
 
-Make the same map over and over, fast.
+CartoStack helps to build the base layers and structure of geoscience maps and figures over and over again without the overhead of redrawing all components every time. 
 
-Weather and climate maps are often produced on a schedule: the coastlines, borders,
-cities, logo and legend never change, only the data and a timestamp do. Redrawing all of
-it with Matplotlib and Cartopy every time is slow. CartoStack draws the map **once**,
-saves it as a layered `.cstack` file, and then builds each new map by swapping in just
-the new data and stacking the layers into a PNG.
+Weather and climate maps are often produced on a schedule: the coastlines, borders, cities, logo and legend never change, only the data and a timestamp do. Redrawing all of it with Matplotlib and Cartopy every time is slow. CartoStack draws the map **once**, saves it as a layered `.cstack` file, and then builds each new map by swapping in just the new data and stacking the layers into a PNG.
 
-Think of it like a stack of transparent sheets: the basemap is drawn ahead of time, and
-on every run only the data sheet and the title are replaced. Producing a map needs only
-**NumPy and Pillow**, so it is quick to start, light to install, and never touches
-Cartopy, shapefiles or Natural Earth data again.
+The stack can be imagined as transparent sheets: the basemap is drawn ahead of time, and on every run only the data sheet and the title are replaced. Producing a map needs only **NumPy and Pillow**, so it is quick to start, light to install, and never touches Cartopy, shapefiles or Natural Earth data again.
 
 ![Speed-up of CartoStack over the standard Matplotlib/Cartopy render](docs/images/speedup_summary.png)
 
-On a precipitation-forecast map, one product takes about **0.3 s instead of 12 s**, and
-the output matches the full Cartopy render to within a few colour levels on more than
-99.9 % of pixels.
+On a precipitation-forecast map, one product takes about **0.3 s instead of 12 s**, and the output matches the full Cartopy render to within a few colour levels on more than 99.9 % of pixels.
 
 ## Install
 
@@ -58,8 +49,7 @@ with Scene.load("temperature.cstack") as scene:
     scene.save_png("temperature_18z.png")
 ```
 
-Besides gridded data, a map can hold replaceable polygons (such as forecast contours),
-text, and colorbars that update when the colour range changes. Complete examples are in
+In addition to gridded data, a map can hold replaceable polygons (such as forecast contours), text, and colorbars that update when the colour range changes. Complete examples are in
 [`examples/`](examples/README.md).
 
 ## Documentation

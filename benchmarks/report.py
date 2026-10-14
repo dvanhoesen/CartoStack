@@ -7,7 +7,7 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 07b: figures comparing CartoStack with the standard Matplotlib/Cartopy render.
+"""Figures comparing CartoStack with the standard Matplotlib/Cartopy render.
 
 Reads recorded benchmark results, converts them to one common schema
 (``cartostack-bench/1``), and writes figures, ``report.json`` and ``index.md``
@@ -15,12 +15,12 @@ to ``benchmarks/results/report-<UTC stamp>/``.
 
 Inputs (each defaults to the latest matching directory under ``benchmarks/results``):
 
-* ``--grid-baseline``     Session 01 ``baseline_cartopy.py`` result (latest with >= 5 cold runs;
+* ``--grid-baseline``     ``baseline_cartopy.py`` result (latest with >= 5 cold runs;
                           shorter runs such as ``--cold-runs 3`` are treated as smoke runs);
-* ``--qpf-baseline``      Session 01b ``baseline_qpf.py`` result (``qpf-*``, >= 5 cold runs);
-* ``--prototype-runtime`` Session 02 ``prototype_runtime.py`` run (``prototype-*/runtime-*``),
+* ``--qpf-baseline``      ``baseline_qpf.py`` result (``qpf-*``, >= 5 cold runs);
+* ``--prototype-runtime`` ``prototype_runtime.py`` run (``prototype-*/runtime-*``),
                           with its ``compare/compare.json`` from ``prototype_compare.py``;
-* ``--compositor``        Session 06 ``compositor_timing.py`` result (``compositor-*``);
+* ``--compositor``        ``compositor_timing.py`` result (``compositor-*``);
 * ``--bench``             native ``bench.json`` files already in the common schema (repeatable).
                           Every ``benchmarks/results/**/bench.json`` is also read.
 
@@ -91,7 +91,7 @@ SERIES_COLORS = dict(zip(SERIES, SLOTS[:3], strict=True))
 SURFACE, INK, INK_2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 NEUTRAL_BAR = "#8a8984"
 
-# Default prototype configurations (Session 02 decisions: zlib layers, 2x polygons, Pillow stacking).
+# Default prototype configurations (the chosen ones: zlib layers, 2x polygons, Pillow stacking).
 DEFAULT_CONFIG = {("qpf", "cold-process"): "zlib", ("qpf", "loop"): "zlib",
                   ("grid", "cold-process"): "zlib", ("grid", "loop"): "png"}
 
@@ -273,7 +273,7 @@ def adapt_prototype(path: Path) -> list[dict]:
                         "frac_gt8": agg["frac_gt8"]["median"], "frac_gt32": agg["frac_gt32"]["median"],
                         "max": agg["max"]["median"]}
         records.append(record("prototype", workload, mode, config, src, out, accuracy=accuracy, notes=[
-            "Session 02 prototype runtime (NumPy and Pillow only), not the cartostack package."]))
+            "Prototype runtime (NumPy and Pillow only), not the cartostack package."]))
     return records
 
 
@@ -288,7 +288,7 @@ def adapt_compositor(path: Path) -> list[dict]:
                             "encode": s[encode_key]["median_ms"] / 1000},
                "products": []}
         records.append(record("package", workload, "components", encode_key.removeprefix("encode_"),
-                              src, [run], [f"Session 06 medians over {s['load']['reps']} repetitions "
+                              src, [run], [f"Medians over {s['load']['reps']} repetitions "
                                            "(load, warm render, encode); no slot rendering yet."]))
     return records
 
@@ -448,7 +448,7 @@ def comparisons(records) -> list[dict]:
 # --------------------------------------------------------------------------- log reconciliation
 
 def reconcile(inputs, records) -> list[dict]:
-    """Recompute the numbers quoted in SESSIONS.md on their original basis and on the common basis."""
+    """Recompute the numbers quoted in the development log on their original basis and on the common basis."""
     qb = json.loads((inputs["qpf_baseline"] / "results.json").read_text())
     gb = json.loads((inputs["grid_baseline"] / "results.json").read_text())
     pr = json.loads((inputs["prototype_runtime"] / "runtime.json").read_text())["summary"]
@@ -514,9 +514,9 @@ def reconcile(inputs, records) -> list[dict]:
          "ratio of the two values above", common("grid", "Grid, per product (warm)", "speedup")),
         ("QPF prototype 2x, pixels differing > 8 (%)", 0.33, 100 * find(records, "prototype", "qpf", "loop", "png")["accuracy"]["frac_gt8"],
          "compare.json, region all, median over 18 products", None),
-        ("Package QPF load (ms)", 12.0, comp["qpf"]["load"]["median_ms"], "Session 06 median", None),
-        ("Package QPF warm render (ms)", 15.3, comp["qpf"]["render_warm"]["median_ms"], "Session 06 median", None),
-        ("Package grid warm render (ms)", 2.1, comp["grid"]["render_warm"]["median_ms"], "Session 06 median", None),
+        ("Package QPF load (ms)", 12.0, comp["qpf"]["load"]["median_ms"], "compositor median", None),
+        ("Package QPF warm render (ms)", 15.3, comp["qpf"]["render_warm"]["median_ms"], "compositor median", None),
+        ("Package grid warm render (ms)", 2.1, comp["grid"]["render_warm"]["median_ms"], "compositor median", None),
     ]
     out = []
     for claim, logged, recomputed, basis, common_value in rows:
@@ -804,7 +804,7 @@ def fig_components(records, out: Path, stamp: str) -> list[str]:
     for ax, workload in zip(axes, ("qpf", "grid"), strict=True):
         pkg = next((r for r in comps if r["workload"] == workload), None)
         proto = pick(records, "prototype", workload, "loop")
-        # Session 06 scenes use zlib layers; compare load with the prototype's zlib cold runs.
+        # Compositor scenes use zlib layers; compare load with the prototype's zlib cold runs.
         proto_load = find(records, "prototype", workload, "cold-process", "zlib")
         if pkg is None or proto is None or proto_load is None:
             ax.set_visible(False)
@@ -826,7 +826,7 @@ def fig_components(records, out: Path, stamp: str) -> list[str]:
         ax.set_ylabel("Milliseconds (median)")
         ax.set_title({"qpf": "QPF (2210 × 1848)", "grid": "Grid (1200 × 800)"}[workload])
     axes[0].legend(loc="upper left")
-    fig.suptitle("Package components measured so far (Session 06) against the prototype",
+    fig.suptitle("Package components (compositor timing) against the prototype",
                  x=0.01, ha="left", fontsize=13, fontweight="bold")
     fig.tight_layout(rect=(0, 0.06, 1, 0.95))
     footer(fig, sources, stamp)
@@ -872,7 +872,7 @@ def write_index(out: Path, stamp: str, inputs: dict, records, rows, checks) -> N
             lines.append(f"| {workload} | {SERIES_LABELS[series]} | "
                          + " | ".join(f"{ph[p] * 1000:.1f}" for p in PHASES)
                          + f" | {run_totals(rec)['median'] * 1000:.0f} |")
-    lines += ["", "## Reconciliation with SESSIONS.md", "",
+    lines += ["", "## Reconciliation with the development log", "",
               "`Recomputed` uses the basis the log used; `Common basis` is what the figures plot.", "",
               "| Claim | Log | Recomputed | Matches | Log basis | Common basis |",
               "| --- | --- | --- | --- | --- | --- |"]

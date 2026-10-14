@@ -332,7 +332,7 @@
       "cartopy": "0.26.0",
       "python": "3.13"
     },
-    "source": "benchmarks/prototype_build.py (Session 02), scene resources/slow_example.py",
+    "source": "benchmarks/prototype_build.py, scene resources/slow_example.py",
     "sources": [
       {
         "name": "qpf/day_1-3/day13_2026100812.shp (authoring product; data hidden)",

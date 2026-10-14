@@ -448,7 +448,7 @@ class Scene:
         """Colorbars whose grid slot's normalisation or colormap changed after they were drawn.
 
         Their pixels no longer match the data; replace them (``replace_layer``) or hide
-        them. Runtime colorbar redrawing is Session 11.
+        them. Colorbars with redraw data are redrawn automatically; these are the rest.
         """
         return tuple(sorted(self._stale_colorbars & {la.id for la in self._layers}))
 
@@ -670,7 +670,7 @@ def _member(
 
 # Encoded bytes of read-only (owned) buffers, by identity, while the buffer is alive. Owned
 # buffers never change, so an edited scene re-encodes only buffers that are new since the
-# last save (Session 12). Entries go away with their buffer.
+# last save. Entries go away with their buffer.
 _ENCODE_CACHE: dict[int, tuple[weakref.ref[Any], str, bytes]] = {}
 
 

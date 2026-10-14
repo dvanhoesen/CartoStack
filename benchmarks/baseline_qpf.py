@@ -12,7 +12,7 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 01b: Cartopy baseline for the WPC QPF workload (resources/slow_example.py).
+"""Cartopy baseline for the WPC QPF workload (resources/slow_example.py).
 
 The drawing code is ported from ``resources/slow_example.py`` without changing
 what it draws. Downloading and extracting the WPC tarballs is replaced by
@@ -30,7 +30,7 @@ Measured (fresh processes; results in ``benchmarks/results/qpf-<UTC timestamp>/`
     uv run benchmarks/baseline_qpf.py
     uv run benchmarks/baseline_qpf.py --child product --day 1-3 --out x.png
 
-Constants and ``render_product()`` are importable for Session 02.
+Constants and ``render_product()`` are importable for the prototype benchmarks.
 """
 
 import time
@@ -103,7 +103,7 @@ DAYS = [
 ]
 STATIC_GPKG = ["counties", "lakes", "cities", "nymask", "states", "coastlines"]
 
-# Draw groups: what Session 02 stores as layers.
+# Draw groups: what the prototype stores as layers.
 GROUPS = ("below", "data", "above", "decorations", "subtitle")
 PNG_VARIANTS = (("rgba", 6), ("rgb", 6), ("rgba", 1), ("rgb", 1))
 
@@ -220,7 +220,7 @@ def build_figure(static: dict, prod: dict) -> dict:
     """Build one product's figure exactly as the example does (lines 253-407).
 
     Returns the figure, its artists by draw group, and build timings; nothing
-    is drawn yet. ``render_product`` saves it; Session 02 renders layers from it.
+    is drawn yet. ``render_product`` saves it; the prototype renders layers from it.
     """
     import cartopy.crs as ccrs
     import matplotlib.patches as mpatches

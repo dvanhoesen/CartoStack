@@ -1,4 +1,4 @@
-"""Archive lifetime and save-time encoding (Session 12)."""
+"""Archive lifetime and save-time encoding."""
 
 from __future__ import annotations
 

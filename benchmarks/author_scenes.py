@@ -15,7 +15,7 @@
 # [tool.uv.sources]
 # cartostack = { path = "..", editable = true }
 # ///
-"""Session 10: author the QPF and grid scenes with ``cartostack.build.SceneBuilder``.
+"""Author the QPF and grid scenes with ``cartostack.build.SceneBuilder``.
 
 The figures come from the baseline scripts unchanged (``baseline_qpf.build_figure`` for
 Day 1-3, the port of ``resources/slow_example.py``; ``baseline_cartopy.build_scene``

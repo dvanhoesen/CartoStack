@@ -428,7 +428,7 @@ def test_authored_file_updated_in_a_fresh_process_matches_a_full_cartopy_render(
     assert (d > 8).mean() < 0.02
 
 
-# --- Build-to-runtime milestone (Session 11) ------------------------------------------------
+# --- Build-to-runtime milestone ----------------------------------------------------------
 
 
 def milestone_figure(vals: np.ndarray, vmin: float, vmax: float, rings: list[Any], title: str,

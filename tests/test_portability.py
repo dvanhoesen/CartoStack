@@ -1,4 +1,4 @@
-"""Source independence and no network on the runtime path, in a fresh process (Session 13).
+"""Source independence and no network on the runtime path, in a fresh process.
 
 The full procedure (wheel in a core-only venv, fixtures removed) is
 ``scripts/check_portability.py``; this test keeps the same guarantees checked in every

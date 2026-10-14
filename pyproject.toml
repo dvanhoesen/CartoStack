@@ -30,7 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 # Build-time authoring of .cstack files (cartostack.build); never imported by the runtime.
 build = [
-    # Lowest versions verified (Session 15): Matplotlib 3.11.0's colorbars differ from what
+    # Lowest versions verified: Matplotlib 3.11.0's colorbars differ from what
     # the runtime redraws, and with Cartopy 0.25 the authored georeference is wrong.
     "matplotlib>=3.11.1",  # text slots reproduce Matplotlib 3.11's text layout
     "cartopy>=0.26",

@@ -12,10 +12,10 @@
 # [tool.uv]
 # exclude-newer = "2026-10-08T00:00:00Z"
 # ///
-"""Session 02: compare prototype runtime outputs with full Cartopy renders.
+"""Compare prototype runtime outputs with full Cartopy renders.
 
 Every runtime output is compared with the full render of the *same* inputs:
-QPF products with the Session 01b baseline products, grid variants with
+QPF products with the ``baseline_qpf.py`` products, grid variants with
 ``baseline_cartopy.render(variant)``. Differences are reported per region,
 using the build's layers as masks:
 
