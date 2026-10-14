@@ -33,5 +33,7 @@ def test_verify_detects_changed_and_missing_files(tmp_path: Path) -> None:
 
 @pytest.mark.fixtures
 def test_prepared_fixtures_include_reference_sources(fixture_dir: Path) -> None:
-    assert (fixture_dir / "NYS_Shoreline_Counties" / "NYS Counties.shp").exists()
+    ne = fixture_dir / "shapefiles" / "natural_earth" / "cultural"
+    assert (ne / "ne_10m_admin_2_counties.shp").exists()
+    assert (ne / "ne_10m_populated_places.shp").exists()
     assert any((fixture_dir / "qpf").glob("day_*/*.shp"))

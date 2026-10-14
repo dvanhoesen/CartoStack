@@ -59,8 +59,8 @@ uv venv --python 3.13 /tmp/cs-wheel && uv pip install --python /tmp/cs-wheel/bin
 (cd /tmp && /tmp/cs-wheel/bin/python -c "import cartostack; print(cartostack.__file__)")
 ```
 
-`scripts/check_portability.py` (needs the build extra and the fixtures) authors the
-reference scenes, installs the wheel into a fresh core-only environment, hides the source
+`scripts/check_portability.py` (needs the build extra and the fixtures) authors the example
+scenes, installs the wheel into a fresh core-only environment, hides the source
 data, and renders every product with file access audited and the network blocked. It
 fails if any build library is importable, any file outside the sandbox is opened, or any
 output differs from the development environment:
@@ -71,9 +71,9 @@ uv run scripts/check_portability.py [--sandbox DIR] [--python 3.13]
 
 ## Fixtures
 
-Reference data (Natural Earth, NY counties, a WPC QPF snapshot, SWRCC GeoPackages) is
-prepared once, with network access, into the gitignored `benchmarks/data/` (override with
-`CARTOSTACK_FIXTURE_DIR`):
+Reference data (public downloads only: Natural Earth layers, including US counties, and a
+WPC QPF snapshot) is prepared once, with network access, into the gitignored
+`benchmarks/data/` (override with `CARTOSTACK_FIXTURE_DIR`):
 
 ```bash
 uv run scripts/fetch_fixtures.py           # prepare (network; idempotent)
@@ -85,9 +85,16 @@ does not verify.
 
 ## Benchmarks
 
-`benchmarks/` holds standalone scripts comparing CartoStack with the Matplotlib/Cartopy
-render; run them with `uv run benchmarks/<script>.py`. `benchmarks/report.py` turns the
-results into figures. They are not part of the package or the test suite.
+`benchmarks/cron_jobs.py` times a simulated scheduled job built from the examples: the
+hazard and QPF maps drawn by their Matplotlib/Cartopy scripts in fresh processes, against
+the CartoStack update scripts in a core-only environment, over 10 runs. It records wall
+time, CPU time and peak memory and writes figures to `benchmarks/results/cron-<stamp>/`
+(`--readme` refreshes the README figure). It needs the build extra and the fixtures, and is
+not part of the package or the test suite:
+
+```bash
+uv run --extra build python benchmarks/cron_jobs.py --runs 10 --readme
+```
 
 ## Releasing
 

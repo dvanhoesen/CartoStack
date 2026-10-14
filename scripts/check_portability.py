@@ -7,28 +7,26 @@
 Stages (each in its own process; this orchestrator needs only the standard library and
 ``uv``):
 
-1. **Author** the QPF and grid scenes from the baseline figures with the ``build`` extra
-   (``benchmarks/author_scenes.py``), and export runtime inputs as plain NumPy files:
-   every WPC QPF product's rings, values, and subtitle, and the grid's analytic fields
-   (data acquisition is out of scope, as everywhere in this project).
+1. **Author** the example scenes with the ``build`` extra, into a sandbox outside the
+   repository: ``examples/author_qpf.py``, ``author_grid.py`` (with its sample inputs) and
+   ``author_hazard.py`` (with its synthetic GeoTIFFs). The WPC QPF product shapefiles are
+   copied in as runtime inputs, with the runtime examples (``update_qpf.py``,
+   ``wpc_qpf.py``, ``update_hazard.py``, ``hazard_data.py``).
 2. **Core-only environment**: build the wheel and install it into a new venv inside the
-   sandbox (outside the repository) with its dependencies only (NumPy, Pillow), then
-   confirm that Matplotlib, Cartopy, pyproj, shapely, GeoPandas and pyogrio are not
-   installed there.
+   sandbox with its dependencies only (NumPy, Pillow), then confirm that Matplotlib,
+   Cartopy, pyproj, shapely, GeoPandas and pyogrio are not installed there.
 3. **Sources removed**: the repository's fixture directory (``benchmarks/data``: Natural
-   Earth, counties, GeoPackages, WPC shapefiles) is renamed away for the runtime stage and
-   always restored. The runtime runs with ``HOME`` set inside the sandbox, so the user's
-   Cartopy Natural Earth cache (``~/.local/share/cartopy``) is not reachable either; it is
-   not touched.
+   Earth and the WPC snapshot) is renamed away for the runtime stage and always restored.
+   The runtime runs with ``HOME`` set inside the sandbox, so the user's Cartopy Natural
+   Earth cache (``~/.local/share/cartopy``) is not reachable either; it is not touched.
 4. **Runtime** in the core venv, in isolated mode (``python -I``), from the sandbox: an
    audit hook records every file opened and refuses every network call (``socket.*``,
-   ``urllib.Request``). It renders all 18 QPF products, the grid's 4 variants, a grid
-   normalization change (colorbar redraw), an added layer, then saves, reloads and
-   re-renders. It then checks ``sys.modules`` and the opened files: anything outside the
-   sandbox, the venv and the Python installation fails.
-5. **Compare** (development environment): the runtime PNGs against the full Cartopy
-   renders (QPF: ``baseline_qpf.py`` products; grid: prototype references), and against the
-   same updates rendered by the development environment (must be pixel-identical).
+   ``urllib.Request``). It runs the QPF and hazard update examples (18 + 14 maps), renders
+   the grid's sample inputs, changes the grid's colour range (colorbar redraw), adds a
+   layer, then saves, reloads and re-renders. It then checks ``sys.modules`` and the opened
+   files: anything outside the sandbox, the venv and the Python installation fails.
+5. **Compare** (development environment): the same updates rendered by the development
+   environment must be pixel-identical.
 
     uv run scripts/check_portability.py [--sandbox DIR] [--python 3.13]
 
@@ -50,37 +48,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "benchmarks" / "results"
 DATA = ROOT / "benchmarks" / "data"
+EXAMPLES = ROOT / "examples"
+RUNTIME_EXAMPLES = ("update_qpf.py", "wpc_qpf.py", "update_hazard.py", "hazard_data.py")
 FORBIDDEN = ("matplotlib", "cartopy", "pyproj", "shapely", "geopandas", "pyogrio", "pandas")
 
-EXPORT = r"""
-import json, sys
-from pathlib import Path
-import numpy as np
-sys.path.insert(0, "benchmarks")
-import prototype_runtime as proto
-from baseline_cartopy import make_field, title_text
-
-out = Path(sys.argv[1])
-out.mkdir(parents=True, exist_ok=True)
-meta = {"qpf": [], "grid": []}
-for day in proto.QPF_DAYS:
-    q = proto.read_qpf(proto.DATA / "qpf" / f"day_{day}")
-    rings = [r for rec in q["rings"] for r in rec]
-    np.savez(out / f"qpf_{day}.npz",
-             coords=np.concatenate(rings) if rings else np.zeros((0, 2)),
-             ring_sizes=np.array([len(r) for r in rings], np.int64),
-             record_sizes=np.array([len(rec) for rec in q["rings"]], np.int64),
-             values=np.asarray(q["values"], np.float64))
-    meta["qpf"].append({"day": day, "subtitle": q["subtitle"]})
-for v in range(4):
-    _, _, values = make_field(v)
-    np.save(out / f"grid_{v}.npy", values)
-    meta["grid"].append({"variant": v, "subtitle": title_text(v)[1]})
-(out / "inputs.json").write_text(json.dumps(meta, indent=1))
-"""
-
-RUNTIME = r"""  # noqa: UP031 - filled in with % below
-import os, sys, json, time
+RUNTIME = r"""
+import os, sys, json, glob, runpy, contextlib, io
 SANDBOX = os.path.abspath(sys.argv[1])
 OUT = os.path.join(SANDBOX, sys.argv[2])
 opened, network = set(), []
@@ -98,55 +71,52 @@ from cartostack import Scene
 
 os.makedirs(OUT, exist_ok=True)
 inputs = os.path.join(SANDBOX, "inputs")
-meta = json.load(open(os.path.join(inputs, "inputs.json")))
-log = {"qpf": [], "grid": []}
+log = {}
 
-def records(day):
-    z = np.load(os.path.join(inputs, f"qpf_{day}.npz"))
-    coords, ring_sizes, record_sizes = z["coords"], z["ring_sizes"], z["record_sizes"]
-    rings = np.split(coords, np.cumsum(ring_sizes)[:-1]) if len(ring_sizes) else []
-    out, k = [], 0
-    for n in record_sizes:
-        out.append(rings[k:k + n]); k += n
-    return out, z["values"]
+def example(script, *argv):
+    sys.argv = [script, *argv]
+    with contextlib.redirect_stdout(io.StringIO()) as printed:
+        runpy.run_path(os.path.join(SANDBOX, "examples", script), run_name="__main__")
+    return printed.getvalue().strip().splitlines()[-1]
 
-with Scene.load(os.path.join(SANDBOX, "qpf.cstack")) as s:
-    for item in meta["qpf"]:
-        recs, values = records(item["day"])
-        t = time.perf_counter()
-        s.replace_polygons("qpf", recs, values)
-        s.text["subtitle"] = item["subtitle"]
-        s.save_png(os.path.join(OUT, f"qpf_plot_day_{item['day']}.png"), mode="RGBA")
-        log["qpf"].append({"day": item["day"], "s": time.perf_counter() - t})
+qpf_days = sorted(glob.glob(os.path.join(inputs, "qpf", "day_*")))
+log["qpf"] = example("update_qpf.py", os.path.join(SANDBOX, "qpf.cstack"), *qpf_days,
+                     "--out", os.path.join(OUT, "qpf"))
+tifs = sorted(glob.glob(os.path.join(inputs, "hazard", "*.tif")))
+log["hazard"] = example("update_hazard.py", os.path.join(SANDBOX, "hazard"), *tifs,
+                        "--out", os.path.join(OUT, "hazard"))
 
 with Scene.load(os.path.join(SANDBOX, "grid.cstack")) as s:
-    for item in meta["grid"]:
-        values = np.load(os.path.join(inputs, f"grid_{item['variant']}.npy"))
-        s.replace_grid("temperature", values)
-        s.text["subtitle"] = item["subtitle"]
-        s.save_png(os.path.join(OUT, f"variant_{item['variant']}.png"), mode="RGB")
-    s.replace_grid("temperature", values, vmin=-15.0, vmax=40.0)
+    for path in sorted(glob.glob(os.path.join(inputs, "grid", "*.npy"))):
+        name = os.path.basename(path)[:-4]
+        s.replace_grid("temperature", np.load(path))
+        s.text["subtitle"] = f"Sample input {name}"
+        s.save_png(os.path.join(OUT, f"grid_{name}.png"), mode="RGB")
+    s.replace_grid("temperature", np.load(path), vmin=-15.0, vmax=40.0)
     log["stale_colorbars_after_norm_change"] = list(s.stale_colorbars)
     s.save_png(os.path.join(OUT, "grid_new_norm.png"), mode="RGB")
     yy, xx = np.mgrid[0:48, 0:48]
-    logo = np.zeros((48, 48, 4), np.uint8)
-    logo[..., 0], logo[..., 2] = 200, 60
-    logo[..., 3] = np.where((yy - 24) ** 2 + (xx - 24) ** 2 < 400, 255, 0)
-    s.add_layer("logo", logo, left=1140, top=12)
-    s.save_png(os.path.join(OUT, "grid_with_logo.png"), mode="RGB")
+    badge = np.zeros((48, 48, 4), np.uint8)
+    badge[..., 0], badge[..., 2] = 200, 60
+    badge[..., 3] = np.where((yy - 24) ** 2 + (xx - 24) ** 2 < 400, 255, 0)
+    s.add_layer("badge", badge, left=1140, top=12)
+    s.save_png(os.path.join(OUT, "grid_with_badge.png"), mode="RGB")
     saved = os.path.join(OUT, "grid_updated.cstack")
     s.save(saved)
     again = Scene.load(saved)
     log["reload_identical"] = bool(np.array_equal(again.render(), s.render()))
 
 prefixes = [SANDBOX, os.path.realpath(SANDBOX), sys.prefix, sys.base_prefix,
-            os.path.realpath(sys.prefix), os.path.realpath(sys.base_prefix), "/dev/"]
+            os.path.realpath(sys.prefix), os.path.realpath(sys.base_prefix), "/dev/",
+            # operating-system data, not map sources: the time-zone database (zoneinfo,
+            # for the QPF valid times) and the macOS version file (platform.mac_ver)
+            "/usr/share/zoneinfo/", "/System/Library/CoreServices/SystemVersion.plist"]
+log["pngs"] = len(glob.glob(os.path.join(OUT, "**", "*.png"), recursive=True))
 log["files_opened"] = len(opened)
 log["outside_allowed"] = sorted(p for p in opened if not any(p.startswith(x) for x in prefixes))
 log["network_attempts"] = network
 log["forbidden_modules"] = sorted(m for m in sys.modules if m.split(".")[0] in __FORBIDDEN__)
 log["python"] = sys.version.split()[0]
-log["executable"] = sys.executable
 import PIL
 log["versions"] = {"numpy": np.__version__, "pillow": PIL.__version__,
                    "cartostack": __import__("cartostack").__version__}
@@ -155,40 +125,21 @@ print(json.dumps(log))
 """.replace("__FORBIDDEN__", repr(FORBIDDEN))
 
 COMPARE = r"""
-import json, sys, statistics
+import json, sys
 from pathlib import Path
 import numpy as np
 from PIL import Image
-sys.path.insert(0, "benchmarks")
-from prototype_compare import diff_stats, region_masks
 
 core, dev, out = (Path(a) for a in sys.argv[1:4])
-build = max(p for p in Path("benchmarks/results").glob("prototype-*") if (p / "layers").is_dir())
-qpf_ref = max(Path("benchmarks/results").glob("qpf-*/products"))
-grid_ref = max(build.glob("runtime-*/compare"))
-rgb = lambda p: np.asarray(Image.open(p).convert("RGB")).astype(np.int16)
-report = {"identical_to_dev_env": {}, "qpf": {}, "grid": {}}
-for png in sorted(core.glob("*.png")):
-    a, b = np.asarray(Image.open(png)), np.asarray(Image.open(dev / png.name))
-    report["identical_to_dev_env"][png.name] = bool(a.shape == b.shape and np.array_equal(a, b))
-masks = region_masks(build / "layers", "qpf")
-for png in sorted(core.glob("qpf_plot_day_*.png")):
-    report["qpf"][png.name] = diff_stats(rgb(png), rgb(qpf_ref / png.name), masks)
-gmasks = region_masks(build / "layers", "grid")
-for v in range(4):
-    report["grid"][f"variant_{v}"] = diff_stats(rgb(core / f"variant_{v}.png"),
-                                                rgb(grid_ref / f"ref_grid_variant_{v}.png"), gmasks)
-def med(section, region, metric):
-    return statistics.median(p[region][metric] for p in report[section].values())
-report["summary"] = {
-    "qpf_all_gt8": med("qpf", "all", "frac_gt8"), "qpf_all_gt32": med("qpf", "all", "frac_gt32"),
-    "grid_all_gt8": med("grid", "all", "frac_gt8"),
-    "grid_all_gt32": med("grid", "all", "frac_gt32"),
-    "identical_to_dev_env": all(report["identical_to_dev_env"].values()),
-    "pngs": len(report["identical_to_dev_env"]),
-}
+identical = {}
+for png in sorted(core.rglob("*.png")):
+    a, b = np.asarray(Image.open(png)), np.asarray(Image.open(dev / png.relative_to(core)))
+    identical[str(png.relative_to(core))] = bool(a.shape == b.shape and np.array_equal(a, b))
+same = bool(identical) and all(identical.values())
+summary = {"pngs": len(identical), "identical_to_dev_env": same}
+report = {"identical_to_dev_env": identical, **summary}
 (out / "compare.json").write_text(json.dumps(report, indent=1))
-print(json.dumps(report["summary"]))
+print(json.dumps(summary))
 """
 
 
@@ -198,11 +149,26 @@ def run(cmd: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, text=True, capture_output=True, check=True, **kw)  # type: ignore[call-overload]
 
 
+def author(sandbox: Path) -> None:
+    """Stage 1: the example scenes and their runtime inputs, in the sandbox."""
+    build = ["uv", "run", "--extra", "build", "python"]
+    inputs = sandbox / "inputs"
+    run([*build, "examples/author_qpf.py", str(sandbox / "qpf.cstack")], cwd=ROOT)
+    run([*build, "examples/author_grid.py", str(sandbox / "grid.cstack"),
+         "--inputs", str(inputs / "grid")], cwd=ROOT)  # fmt: skip
+    run([*build, "examples/author_hazard.py", str(sandbox / "hazard"),
+         "--inputs", str(inputs / "hazard")], cwd=ROOT)  # fmt: skip
+    for day in sorted((DATA / "qpf").glob("day_*")):
+        shutil.copytree(day, inputs / "qpf" / day.name, dirs_exist_ok=True)
+    (sandbox / "examples").mkdir(exist_ok=True)
+    for name in RUNTIME_EXAMPLES:
+        shutil.copy2(EXAMPLES / name, sandbox / "examples" / name)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--sandbox", type=Path, help="working directory outside the repository")
     parser.add_argument("--python", default="3.13", help="Python for the core-only venv")
-    parser.add_argument("--authored", type=Path, help="reuse an authored-<stamp> directory")
     args = parser.parse_args()
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     sandbox = (args.sandbox or Path(tempfile.mkdtemp(prefix="cartostack-portability-"))).resolve()
@@ -213,16 +179,8 @@ def main() -> None:
     out.mkdir(parents=True)
     report: dict[str, object] = {"created_utc": stamp, "sandbox": str(sandbox)}
 
-    # 1. Author and export inputs (build-capable environments, with the fixtures present).
-    if args.authored:
-        authored = args.authored.resolve()
-    else:
-        run(["uv", "run", "benchmarks/author_scenes.py"], cwd=ROOT)
-        authored = max(RESULTS.glob("authored-*"))
-    for name in ("qpf.cstack", "grid.cstack"):
-        shutil.copy2(authored / name, sandbox / name)
-    run(["uv", "run", "python", "-c", EXPORT, str(sandbox / "inputs")], cwd=ROOT)
-    report["authored"] = str(authored.relative_to(ROOT))
+    # 1. Author the examples and gather their inputs (build extra, fixtures present).
+    author(sandbox)
 
     # 2. Core-only venv from the wheel, outside the repository.
     dist = sandbox / "dist"
@@ -279,9 +237,11 @@ def main() -> None:
     checks = {
         "no build libraries installed": not any(installed.values()),
         "no forbidden modules imported": not core_log["forbidden_modules"],
-        "no files opened outside sandbox/venv/python": not core_log["outside_allowed"],
+        "no files opened outside sandbox/venv/python/OS data": not core_log["outside_allowed"],
         "no network attempts": not core_log["network_attempts"],
         "cartostack imported from the venv": str(venv) in core_log["cartostack_file"],
+        "all example maps written (18 QPF + 14 hazard)": core_log["qpf"].startswith("18 products")
+        and core_log["hazard"].startswith("14 maps"),
         "reload renders identically": core_log["reload_identical"],
         "colorbar redrawn (none stale)": core_log["stale_colorbars_after_norm_change"] == [],
         "pixel-identical to the dev environment": report["compare"]["identical_to_dev_env"],
@@ -290,16 +250,9 @@ def main() -> None:
     (out / "report.json").write_text(json.dumps(report, indent=1))
     for name, ok in checks.items():
         print(f"{'PASS' if ok else 'FAIL'}  {name}")
-    c = report["compare"]
-    print(
-        f"QPF vs Cartopy (median of 18): >8 {c['qpf_all_gt8'] * 100:.3f} %, "
-        f">32 {c['qpf_all_gt32'] * 100:.3f} %;"
-        f" grid (median of 4): >8 {c['grid_all_gt8'] * 100:.2f} %, "
-        f">32 {c['grid_all_gt32'] * 100:.3f} %"
-    )
     print(
         f"core env: Python {core_log['python']}, {core_log['versions']}, "
-        f"packages {report['core_env_packages']}"
+        f"packages {report['core_env_packages']}; {core_log['pngs']} PNGs"
     )
     print(f"results → {out.relative_to(ROOT)}")
     if not all(checks.values()):

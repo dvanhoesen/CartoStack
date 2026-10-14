@@ -92,21 +92,21 @@ The speed comes from work the runtime skips: no heavy imports, no reading of geo
 sources, no projecting of static geometry, no artist construction and no redrawing of
 unchanged layers.
 
-![Time to make one map in a fresh process: Matplotlib/Cartopy 16.1 s, most of it drawing the static map, versus CartoStack 0.14 s](images/cold_start.png)
+![A scheduled job making 32 maps from data on disk, average of 10 runs: Matplotlib/Cartopy 33.3 s, CartoStack 1.9 s (18× faster)](images/scheduled_job.png)
 
-| Workload (data on disk, Apple M3 Pro) | Matplotlib/Cartopy | CartoStack | Speed-up |
+| Scheduled job from the examples (data on disk, fresh process per job, Apple M3 Pro, average of 10 runs) | Matplotlib/Cartopy | CartoStack | Speed-up |
 | --- | --- | --- | --- |
-| WPC QPF map, one product per fresh process | 11.93 s | 294 ms | 40.6× |
-| WPC QPF, all 18 products in one process | 27.62 s | 2.61 s | 10.6× |
-| Temperature grid, one product per fresh process | 16.11 s | 144 ms | 112× |
-| Temperature grid, per product in a warm process | 269 ms | 28 ms | 9.6× |
+| Hazard maps: 7 synthetic daily GeoTIFFs × 2 regions = 14 maps | 11.3 s | 0.65 s | 17× |
+| WPC QPF maps: 18 products | 22.0 s | 1.24 s | 18× |
+| Both jobs, back to back (32 maps) | 33.3 s | 1.89 s | 18× |
+| CPU time (user + system), both jobs | 39.6 s | 1.9 s | 21× less |
+| Peak memory per job (hazard / QPF) | 460 / 505 MB | 154 / 257 MB | 2–3× less |
 
-What remains for each product is process start-up, loading the file, rendering the changed
-layers, compositing and PNG encoding. PNG encoding is now one of the largest costs. The QPF
-output matches the full Cartopy render to within 8 color levels on all but 0.07 % of pixels.
-These times exclude building the `.cstack` file, which is done once per map layout and
-takes about as long as one ordinary render (18 s for the temperature map, 12 s for QPF).
-`benchmarks/report.py` regenerates the figure and numbers from the benchmark results.
+What remains for each map is process start-up, loading the file, rendering the changed
+layers, compositing and PNG encoding. PNG encoding is now one of the largest costs. These
+times exclude building the `.cstack` files, which is done once per map layout (about 9 s
+for the two hazard scenes and 7 s for QPF, including the original script's own drawing).
+`benchmarks/cron_jobs.py` regenerates the figure and numbers.
 
 ## Reliability
 

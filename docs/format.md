@@ -357,7 +357,8 @@ map says which grid cell each pixel shows.
   `−1`. `cells` (`centers` | `edges`, default `centers`) records whether the authoring
   coordinates were cell centers or edges; it is informational, since the mapping is fully in
   the index map. Index maps are produced at build time by the index-image method: draw the
-  mesh with per-cell colors encoding `k`, with anti-aliasing off.
+  grid exactly as the data render places it (a mesh, or an image drawn with `imshow`), with
+  per-cell colors encoding `k` and anti-aliasing off.
 - **Values → colors.** These are Matplotlib's `Normalize` and `Colormap.__call__` rules,
   reproduced exactly. Values are an array of shape `shape` with a real numeric type,
   converted to `value_dtype` (default `float32`); NaN and masked values are *bad*.

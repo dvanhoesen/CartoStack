@@ -243,3 +243,19 @@ benchmarks/results/
 
 # Local reference copies of the original documentation
 reference/
+
+# Local case studies (not distributed)
+/case_studies/
+
+# Local planning notes
+/plans/
+
+# Prototype-era benchmarks and the original QPF port (kept locally, not distributed)
+/benchmarks/baseline_qpf.py*
+/benchmarks/baseline_cartopy.py*
+/benchmarks/prototype_*.py*
+/benchmarks/author_scenes.py*
+/benchmarks/package_qpf.py
+/benchmarks/package_grid.py
+/benchmarks/compositor_timing.py
+/benchmarks/report.py*

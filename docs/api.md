@@ -108,8 +108,9 @@ Every runtime error is a `cartostack.CartoStackError`, and most are also `ValueE
 
 ## Authoring: `cartostack.build.SceneBuilder`
 
-The usual path wraps a figure that an existing script already draws, and assigns each
-part to a layer:
+You don't rewrite your plotting script; you wrap the figure it already makes. The usual
+path takes the figure an existing script draws, unchanged, and assigns each part to a
+layer:
 
 ```python
 import math
@@ -133,10 +134,14 @@ frame=False, crop=None)` creates a figure with one map axes instead.
 | --- | --- |
 | `add_static(id, *, order, draw=None, artists=(), zorder=None, background=False, opacity=1.0)` | A raster layer of artists: those `draw(ax)` creates, those listed in `artists`, and/or the map-axes artists with `lo <= zorder < hi`. One static layer may take the figure and axes background. |
 | `add_grid_slot(id, *, order, lon, lat, cmap, vmin/vmax or norm, alpha=None, extend="neither", cells="centers", values=None, artists=())` | A grid slot. The pixel→cell index map is made by drawing the grid once with Matplotlib; the colormap LUT is rounded the same way Agg rounds colors. `norm` must be a plain linear `Normalize` without `clip`. |
+| `add_grid_slot(id, *, order, image_extent, image_shape=None, origin="upper", regrid_shape=750, cmap, ...)` | A grid slot for an image drawn with `ax.imshow(..., transform=ccrs.PlateCarree(), interpolation="none")`: pass the same extent (`left, right, bottom, top` in degrees), `origin` and `regrid_shape` instead of `lon`/`lat`. The index map is made through the same `imshow` call, including Cartopy's regridding to the map projection (which needs SciPy or pykdtree, as `imshow` itself does). The shape comes from `image_shape` or `values`. |
 | `add_polygon_slot(id, *, order, bins, fallback=None, round_decimals=None, supersample=4, records=None, values=None, artists=())` | A polygon slot. `bins` are `(lower, upper, color, draw order)` rows. |
 | `add_text_slot(id, artist=None, *, order, **text)` | A text slot from a `Text` artist (font, size, color, anchor) or from `fig.text` keywords. Its font file is embedded. |
 | `add_colorbar(id, colorbar, *, slot, order)` | A colorbar layer that the runtime can redraw when `slot`'s range or colormap changes. |
 | `build(*, rest=None, encoding="rgba8+zlib", provenance=None)` / `save(path, **kw)` | Renders every layer and returns, or also saves, the `Scene`. |
+
+Layer ids are 1–64 lowercase letters, digits, `_` or `-`, starting with a letter or digit;
+an invalid id is refused when the layer is declared.
 
 Every visible artist must belong to exactly one layer. An unassigned artist is an error
 unless `rest="<static id>"` names a layer to collect them. The builder warns when the
@@ -146,13 +151,30 @@ layer order would draw overlapping artists in a different order than Matplotlib.
 its artist (DejaVu Sans by default). Make sure the font's license allows embedding
 before using another font.
 
+## Tips for scheduled jobs
+
+- **Load once, loop.** Load each `.cstack` file once per process and update it for every
+  product; static layers are composited once and reused.
+- **PNG encoding is usually the largest remaining cost.** `save_png(compress_level=1)` is
+  about a quarter faster than the default level 6 on the example maps, for files about a
+  third larger.
+- **Precompute fixed work.** If a script regrids rasters on a fixed grid or computes
+  statistics over fixed zones every run, compute the index or the weights once while
+  authoring and save them next to the scene (`examples/author_hazard.py`).
+- **Conditional annotations.** Author notes that appear only sometimes as their own static
+  layer and toggle them with `scene.show` / `scene.hide`.
+- **Changing layout.** Text slots keep their anchor. A layout that moves with the data
+  (for example a box sized to its widest label) can be authored once per variant, as
+  separate layers, with the matching one shown.
+
 ## Limitations (format 1.0)
 
 - **Polygon slots** support only the Lambert Conformal Conic projection; the runtime
   projects with NumPy instead of pyproj. Static layers and grid slots work with any
   projection Cartopy draws.
 - **Grid slots** support only a linear `vmin`/`vmax` range (no log, boundary or
-  two-slope norms) on a fixed grid. The values' shape must match the shape the slot
+  two-slope norms) on a fixed grid. Integer categories drawn with a `BoundaryNorm` of
+  unit-wide bins map exactly onto a linear range from `-0.5` to `n - 0.5`. The values' shape must match the shape the slot
   was authored with.
 - **Text slots** hold one unrotated line, with no mathtext or usetex. Shaping covers
   ligatures and pair kerning only.

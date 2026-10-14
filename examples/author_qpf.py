@@ -1,37 +1,20 @@
-# /// script
-# requires-python = "==3.13.*"
-# dependencies = [
-#     "cartostack[build]",
-#     "cartopy==0.26.0",
-#     "geopandas==1.2.0",
-#     "matplotlib==3.11.2",
-#     "numpy==2.5.3",
-#     "pillow==12.3.0",
-#     "pyogrio==0.13.0",
-#     "pytz==2026.5",
-# ]
-# [tool.uv]
-# exclude-newer = "2026-10-08T00:00:00Z"
-# [tool.uv.sources]
-# cartostack = { path = "..", editable = true }
-# ///
-"""Author the WPC QPF map from an existing Matplotlib/Cartopy script (build extra).
+"""Author the WPC QPF map from an existing plotting script (build extra).
 
-The figure is the one ``benchmarks/baseline_qpf.py`` draws: a port of the production
-script ``resources/slow_example.py`` (GeoPackage borders and counties, cities, logo,
-legend, title bar), here for the Day 1-3 product. The script is not changed: the builder
-wraps its finished figure and only declares the layers:
+You don't rewrite your plotting script; you wrap the figure it already makes.
+``qpf_map.py`` is an ordinary Matplotlib/Cartopy script. Here its ``draw`` function
+builds the figure for one product, unchanged, and ``SceneBuilder`` only declares which
+parts become which layers:
 
-* ``below``: everything under the precipitation (zorder < 10), with the background;
-* ``qpf``: the polygon slot, with WPC's bin table (lower, upper, color, draw order),
-  a gray fallback, values rounded to 2 decimals, 4x supersampled edges;
-* ``above``: everything else (borders, cities, logo, title bar, legend);
+* ``below``: background, ocean, land and lakes (everything under the forecast);
+* ``qpf``: a polygon slot, with the script's own bin table (lower, upper, colour, draw
+  order), its fallback colour, values rounded to 2 decimals and 4x supersampled edges;
+* ``above``: county, state and coast lines, cities, title, legend and attribution;
 * ``subtitle``: the valid-time line, as a text slot.
 
-Fixtures come from ``benchmarks/data`` (``scripts/fetch_fixtures.py``); the figure is
-cropped like ``savefig(bbox_inches="tight")``, resolved once here.
+Fixtures come from ``benchmarks/data`` (``scripts/fetch_fixtures.py``); nothing is
+downloaded.
 
-    uv run examples/author_qpf.py out/qpf.cstack
+    uv run --extra build python examples/author_qpf.py out/qpf.cstack
 """
 
 from __future__ import annotations
@@ -41,38 +24,53 @@ import math
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "benchmarks"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import baseline_qpf as bq  # the existing figure code
+import qpf_map  # the existing figure code
+from wpc_qpf import read_product
+
+ROOT = Path(__file__).resolve().parent.parent
+QPF_DIR = ROOT / "benchmarks" / "data" / "qpf"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("output", type=Path, help="the .cstack file to write")
-    parser.add_argument("--day", default="1-3", help="the product drawn while authoring")
+    parser.add_argument(
+        "--product",
+        type=Path,
+        default=QPF_DIR / "day_1-3",
+        help="the product drawn while authoring",
+    )
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     from cartostack.build import SceneBuilder
 
-    static, _ = bq.load_static()
-    figure = bq.build_figure(static, bq.read_product(args.day))  # the unchanged script
+    figure = qpf_map.draw(read_product(args.product))  # the unchanged script
 
-    builder = SceneBuilder(figure["fig"], figure["ax"], dpi=bq.SAVE_DPI, crop="tight")
+    builder = SceneBuilder(figure["fig"], figure["ax"], dpi=qpf_map.DPI)
     builder.add_static("below", order=0, background=True, zorder=(-math.inf, 10))
     builder.add_polygon_slot(
         "qpf",
         order=10,
-        bins=bq.QPF_RANGES,  # (lower, upper, color, zorder) rows
-        fallback=("gray", 10),
+        bins=qpf_map.BINS,
+        fallback=qpf_map.OTHER,
         round_decimals=2,
-        artists=figure["data_artists"],  # the drawn polygons become the slot
+        artists=figure["data"],  # the drawn forecast polygons become the slot
     )
-    builder.add_static("above", order=20, zorder=(10, math.inf))
+    builder.add_static(
+        "above",
+        order=20,
+        zorder=(10, math.inf),
+        artists=[figure["title"], figure["note"], figure["legend"]],
+    )
     builder.add_text_slot("subtitle", figure["subtitle"], order=30)
     scene = builder.save(args.output)
-    print(f"wrote {args.output}: {scene.shape[1]}x{scene.shape[0]} px, "
-          f"layers {[layer.id for layer in scene.draw_order()]}")  # fmt: skip
+    print(
+        f"wrote {args.output}: {scene.shape[1]}x{scene.shape[0]} px, "
+        f"layers {[layer.id for layer in scene.draw_order()]}"
+    )
 
 
 if __name__ == "__main__":

@@ -51,10 +51,11 @@ from ..layers import (
     TextSlot,
     evolve,
 )
+from ..manifest import _ID as _LAYER_ID
 from ..manifest import Bin
 from ..scene import Scene
 from .georef import Crop, canvas_geometry, display_to_canvas, resolve_crop
-from .index_map import grid_shape
+from .index_map import grid_shape, image_index_map
 from .index_map import index_map as make_index_map
 
 # 3.11.1: text slots reproduce 3.11 text layout, and colorbar redraw matches 3.11.1+
@@ -90,6 +91,14 @@ class _Grid:
     value_dtype: str
     values: Any
     units: list[Any] = field(default_factory=list)
+    image: dict[str, Any] | None = None  # extent, shape, origin, regrid_shape (imshow grids)
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        if self.image is not None:
+            ny, nx = self.image["shape"]
+            return int(ny), int(nx)
+        return grid_shape(self.lon, self.lat, self.cells)
 
 
 @dataclass
@@ -246,6 +255,11 @@ class SceneBuilder:
         return [*self._statics, *self._grids, *self._polygons, *self._texts, *self._colorbars]
 
     def _check_id(self, layer_id: str) -> None:
+        if not isinstance(layer_id, str) or not _LAYER_ID.fullmatch(layer_id):
+            raise BuildError(
+                f"layer id {layer_id!r} is invalid: use 1-64 lowercase letters, digits, '_' "
+                "or '-', starting with a letter or digit (docs/format.md)"
+            )
         taken = {la.id for la in self._specs()}
         if layer_id in taken:
             raise BuildError(f"layer id {layer_id!r} is already used")
@@ -280,8 +294,8 @@ class SceneBuilder:
         layer_id: str,
         *,
         order: float,
-        lon: ArrayLike,
-        lat: ArrayLike,
+        lon: ArrayLike | None = None,
+        lat: ArrayLike | None = None,
         cmap: Any,
         vmin: float | None = None,
         vmax: float | None = None,
@@ -292,14 +306,42 @@ class SceneBuilder:
         value_dtype: str = "float32",
         values: ArrayLike | None = None,
         artists: Iterable[Any] = (),
+        image_extent: Sequence[float] | None = None,
+        image_shape: tuple[int, int] | None = None,
+        origin: str = "upper",
+        regrid_shape: int = 750,
     ) -> SceneBuilder:
-        """A grid slot for values on ``lon``/``lat`` (degrees; cell ``centers`` or ``edges``).
+        """A grid slot for values on ``lon``/``lat`` (degrees; cell ``centers`` or ``edges``),
+        or for an image drawn with ``imshow``.
 
         The index map is made with the index-image method; the LUT is ``cmap``'s, with
         ``vmin``/``vmax`` (or a linear ``norm``). ``values`` renders initial pixels;
-        ``artists`` (e.g. a preview ``pcolormesh``) are hidden from static layers.
+        ``artists`` (e.g. a preview ``pcolormesh`` or ``imshow``) are hidden from static
+        layers.
+
+        For an image, give ``image_extent`` ``(left, right, bottom, top)`` in degrees and
+        ``origin``/``regrid_shape`` as passed to ``ax.imshow(..., transform=PlateCarree(),
+        interpolation="none")``, instead of ``lon``/``lat``. The image's ``(ny, nx)`` comes
+        from ``image_shape`` or ``values``. The index map is then made through the same
+        ``imshow`` call, including Cartopy's regridding to the map projection.
         """
         self._check_id(layer_id)
+        image = None
+        if image_extent is not None:
+            if lon is not None or lat is not None:
+                raise BuildError(f"{layer_id}: give lon/lat or image_extent, not both")
+            if image_shape is None and values is None:
+                raise BuildError(f"{layer_id}: an image grid needs image_shape or values")
+            shape = tuple(image_shape) if image_shape is not None else np.asarray(values).shape
+            if len(shape) != 2 or min(shape) < 1:
+                raise BuildError(f"{layer_id}: image shape must be (ny, nx), got {shape}")
+            if origin not in ("upper", "lower"):
+                raise BuildError(f"{layer_id}: origin must be 'upper' or 'lower'")
+            image = {"extent": tuple(float(v) for v in image_extent),
+                     "shape": (int(shape[0]), int(shape[1])),
+                     "origin": origin, "regrid_shape": int(regrid_shape)}  # fmt: skip
+        elif lon is None or lat is None:
+            raise BuildError(f"{layer_id}: give lon and lat (or image_extent for an image)")
         if norm is not None:
             from matplotlib.colors import Normalize
 
@@ -312,13 +354,14 @@ class SceneBuilder:
             vmin, vmax = norm.vmin, norm.vmax
         if vmin is None or vmax is None:
             raise BuildError(f"{layer_id}: give vmin and vmax (or a norm)")
-        grid_shape(lon, lat, cells)  # validates the coordinates early
+        if image is None:
+            grid_shape(lon, lat, cells)  # validates the coordinates early
         self._grids.append(
             _Grid(
                 layer_id,
                 float(order),
-                np.asarray(lon),
-                np.asarray(lat),
+                None if lon is None else np.asarray(lon),
+                None if lat is None else np.asarray(lat),
                 cells,
                 cmap,
                 float(vmin),
@@ -328,6 +371,7 @@ class SceneBuilder:
                 value_dtype,
                 values,
                 list(artists),
+                image,
             )
         )
         return self
@@ -881,17 +925,31 @@ class SceneBuilder:
             min(g.bottom, geometry.height),
         )
         for grid in self._grids:
-            imap, partial = make_index_map(
-                fig,
-                ax,
-                grid.lon,
-                grid.lat,
-                cells=grid.cells,
-                dpi=self.dpi,
-                crop=crop,
-                hide=self._units(),
-                clip=clip,
-            )
+            if grid.image is not None:
+                imap, partial = image_index_map(
+                    fig,
+                    ax,
+                    grid.image["shape"],
+                    grid.image["extent"],
+                    origin=grid.image["origin"],
+                    regrid_shape=grid.image["regrid_shape"],
+                    dpi=self.dpi,
+                    crop=crop,
+                    hide=self._units(),
+                    clip=clip,
+                )
+            else:
+                imap, partial = make_index_map(
+                    fig,
+                    ax,
+                    grid.lon,
+                    grid.lat,
+                    cells=grid.cells,
+                    dpi=self.dpi,
+                    crop=crop,
+                    hide=self._units(),
+                    clip=clip,
+                )
             if partial:
                 warnings.warn(
                     f"{grid.id}: {partial} partly covered pixels left as no data", stacklevel=2
@@ -899,7 +957,7 @@ class SceneBuilder:
             slot = GridSlot(
                 id=grid.id,
                 order=grid.order,
-                shape=grid_shape(grid.lon, grid.lat, grid.cells),
+                shape=grid.shape,
                 index_map=imap,
                 lut=lut_from_cmap(grid.cmap),
                 vmin=grid.vmin,

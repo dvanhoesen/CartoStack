@@ -1,9 +1,9 @@
 """Render every WPC QPF product from one authored ``.cstack`` file (NumPy and Pillow only).
 
-The cron-style workload of ``resources/slow_example.py``: load the file once, then for
-each product swap in the new precipitation polygons and the subtitle, and write a PNG.
-Background, state and county borders, cities, logo, legend and title are reused as
-stored; only the polygons are projected (NumPy Lambert Conformal) and filled.
+The scheduled-job workload: load the file once, then for each product swap in the new
+precipitation polygons and the subtitle, and write a PNG. Background, county and state
+lines, cities, title, legend and attribution are reused as stored; only the polygons are
+projected (NumPy Lambert Conformal) and filled.
 
 Each input is a directory holding one WPC QPF shapefile (``.shp`` + ``.dbf``), e.g. the
 snapshots ``scripts/fetch_fixtures.py`` keeps in ``benchmarks/data/qpf/day_*``.

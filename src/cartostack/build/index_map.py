@@ -1,10 +1,12 @@
 """Grid index maps by the index-image method (``docs/format.md`` §8).
 
-The grid is drawn once with ``pcolormesh`` exactly as a data render would place it, but
-with anti-aliasing off and each cell's face color encoding its flat index
-``j * nx + i`` in 24 bits. Decoding the rendered pixels gives, for every pixel, the cell
-Matplotlib draws there. Pixels that are not fully covered (edges of the axes clip path)
-and pixels outside the clip region become ``-1``.
+The grid is drawn once exactly as a data render would place it, but with anti-aliasing
+off and each cell's color encoding its flat index ``j * nx + i`` in 24 bits: with
+``pcolormesh`` for mesh grids (``index_map``), or with ``imshow`` for images, including
+Cartopy's regridding of an image to the map projection (``image_index_map``). Decoding the
+rendered pixels gives, for every pixel, the cell Matplotlib draws there. Pixels that are
+not fully covered (edges of the axes clip path) and pixels outside the clip region become
+``-1``.
 """
 
 from __future__ import annotations
@@ -58,21 +60,13 @@ def index_map(
     canvas pixels; pixels whose center lies outside it become ``-1``.
     """
     import cartopy.crs as ccrs
-    import matplotlib.pyplot as plt
     from matplotlib.collections import QuadMesh
-    from matplotlib.transforms import Bbox
-    from PIL import Image
 
     ny, nx = grid_shape(lon, lat, cells)
     if ny * nx > MAX_CELLS:
         raise ValueError(
             f"grid has {ny * nx} cells; the index-image method encodes at most {MAX_CELLS}"
         )
-    idx = np.arange(ny * nx)
-    codes = (
-        np.column_stack([(idx >> 16) & 255, (idx >> 8) & 255, idx & 255, np.full(idx.size, 255)])
-        / 255.0
-    )
     probe = ax.pcolormesh(
         np.asarray(lon),
         np.asarray(lat),
@@ -84,8 +78,34 @@ def index_map(
         edgecolors="none",
     )
     QuadMesh.set_array(probe, None)  # GeoQuadMesh.set_array rejects None
-    probe.set_facecolor(codes)
-    hidden = [a for a in hide if a.get_visible()]
+    probe.set_facecolor(_codes(ny * nx))
+    return _decode(fig, probe, ny * nx, ax=ax, dpi=dpi, crop=crop, hide=hide, clip=clip)
+
+
+def _codes(n: int) -> NDArray[np.float64]:
+    idx = np.arange(n)
+    return (
+        np.column_stack([(idx >> 16) & 255, (idx >> 8) & 255, idx & 255, np.full(n, 255)]) / 255.0
+    )
+
+
+def _decode(
+    fig: Any,
+    probe: Any,
+    n_cells: int,
+    *,
+    ax: Any,
+    dpi: float,
+    crop: tuple[float, float, float, float] | None,
+    hide: Any,
+    clip: tuple[float, float, float, float] | None,
+) -> tuple[NDArray[np.int32], int]:
+    """Render ``probe`` alone (``hide`` and the backgrounds hidden), decode, remove it."""
+    import matplotlib.pyplot as plt
+    from matplotlib.transforms import Bbox
+    from PIL import Image
+
+    hidden = [a for a in hide if a.get_visible() and a is not probe]
     patches = [p for p in (fig.patch, ax.patch) if p.get_visible()]
     try:
         for artist in (*hidden, *patches):
@@ -103,7 +123,7 @@ def index_map(
     full = img[..., 3] == 255
     partial = int(((img[..., 3] > 0) & ~full).sum())
     out[~full] = -1
-    out[out >= ny * nx] = -1
+    out[out >= n_cells] = -1
     if clip is not None:
         left, top, right, bottom = clip
         rows = np.arange(out.shape[0]) + 0.5
@@ -111,3 +131,37 @@ def index_map(
         out[(rows < top) | (rows >= bottom), :] = -1
         out[:, (cols < left) | (cols >= right)] = -1
     return np.ascontiguousarray(out), partial
+
+
+def image_index_map(
+    fig: Any,
+    ax: Any,
+    shape: tuple[int, int],
+    extent: tuple[float, float, float, float],
+    *,
+    origin: str = "upper",
+    regrid_shape: int = 750,
+    dpi: float,
+    crop: tuple[float, float, float, float] | None,
+    hide: Any = (),
+    clip: tuple[float, float, float, float] | None = None,
+) -> tuple[NDArray[np.int32], int]:
+    """``(index_map, partial_pixels)`` for an image drawn on ``ax`` with ``imshow``.
+
+    ``shape`` is the image's ``(ny, nx)`` and ``extent`` its ``(left, right, bottom, top)``
+    in geodetic degrees (``PlateCarree``), with ``origin`` and ``regrid_shape`` as passed to
+    ``ax.imshow(..., transform=ccrs.PlateCarree(), interpolation="none")``. Cartopy regrids
+    the image to the map projection with nearest neighbours and Matplotlib draws the result,
+    so the probe is an index-encoded RGBA image drawn through the same call.
+    """
+    import cartopy.crs as ccrs
+
+    ny, nx = shape
+    if ny * nx > MAX_CELLS:
+        raise ValueError(
+            f"image has {ny * nx} cells; the index-image method encodes at most {MAX_CELLS}"
+        )
+    rgba = np.rint(_codes(ny * nx) * 255).astype(np.uint8).reshape(ny, nx, 4)
+    probe = ax.imshow(rgba, extent=extent, origin=origin, transform=ccrs.PlateCarree(),
+                      interpolation="none", regrid_shape=regrid_shape)  # fmt: skip
+    return _decode(fig, probe, ny * nx, ax=ax, dpi=dpi, crop=crop, hide=hide, clip=clip)

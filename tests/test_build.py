@@ -291,6 +291,56 @@ def test_index_map_matches_pcolormesh_pixels(cells: str, two_d: bool) -> None:
     assert (np.abs(px - ref).max(-1)[mapped] == 0).mean() > 0.995
 
 
+@pytest.mark.parametrize("origin", ["upper", "lower"])
+def test_image_index_map_matches_imshow_pixels(origin: str) -> None:
+    """An image drawn with Cartopy ``imshow`` (regridded to the map) is reproduced exactly."""
+    from matplotlib.colors import ListedColormap
+
+    try:  # Cartopy's image regridding needs one of them
+        import pykdtree  # noqa: F401
+    except ImportError:
+        pytest.importorskip("scipy")
+
+    b = SceneBuilder.new(PROJ, EXTENT, width=500, height=350)
+    rng = np.random.default_rng(7)
+    cats = rng.integers(0, 6, (45, 70)).astype(np.uint8)  # categories, 5 = no data
+    cmap = ListedColormap(["#e8f9e7", "#f4f257", "#f69632", "#e22f33", "#7a0e7f", (1, 1, 1, 0)])
+    extent = (-82.0, -70.0, 39.0, 47.0)
+    image = b.ax.imshow(cats, extent=extent, origin=origin, cmap=cmap, vmin=-0.5, vmax=5.5,
+                        interpolation="none", transform=ccrs.PlateCarree())  # fmt: skip
+    b.add_grid_slot("cat", order=0, image_extent=extent, origin=origin, cmap=cmap, vmin=-0.5,
+                    vmax=5.5, values=cats, artists=[image])  # fmt: skip
+    b.fig.patch.set_visible(False)
+    b.ax.patch.set_visible(False)
+    ref = np.asarray(
+        Image.open(io.BytesIO(_png(b.fig, 100, transparent=True))).convert("RGBA")
+    ).astype(int)
+    scene = b.build()
+    slot = scene["cat"]
+    assert slot.shape == cats.shape
+    mapped = slot.index_map >= 0
+    assert mapped.mean() > 0.5
+    assert (np.abs(slot.pixels.astype(int) - ref).max(-1)[mapped] == 0).all()
+
+
+@pytest.mark.parametrize("bad", ["Title", "pct_Extreme", "", "-x", "a" * 65])
+def test_invalid_layer_ids_are_refused_when_declared(bad: str) -> None:
+    b = SceneBuilder.new(PROJ, EXTENT, width=200, height=150)
+    with pytest.raises(BuildError, match="is invalid"):
+        b.add_static(bad, order=0)
+
+
+def test_image_grid_slot_arguments_are_checked() -> None:
+    b = SceneBuilder.new(PROJ, EXTENT, width=200, height=150)
+    with pytest.raises(BuildError, match="not both"):
+        b.add_grid_slot("a", order=0, lon=[0, 1], lat=[0, 1], image_extent=(0, 1, 0, 1),
+                        image_shape=(2, 2), cmap="viridis", vmin=0, vmax=1)  # fmt: skip
+    with pytest.raises(BuildError, match="image_shape or values"):
+        b.add_grid_slot("b", order=0, image_extent=(0, 1, 0, 1), cmap="viridis", vmin=0, vmax=1)
+    with pytest.raises(BuildError, match="give lon and lat"):
+        b.add_grid_slot("c", order=0, cmap="viridis", vmin=0, vmax=1)
+
+
 def _png(fig: Any, dpi: float, **kw: Any) -> bytes:
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, **kw)

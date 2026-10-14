@@ -4,15 +4,12 @@
 # ///
 """Prepare and verify the local fixtures shared by the benchmarks and the test suite.
 
-Preparing is one-time and network-allowed. Copies the Natural Earth shapefiles already in
-the Cartopy cache and the New York county shapefile from ``resources/``,
-downloads ``ne_10m_populated_places`` (the only file not cached locally),
-copies the SWRCC prepared GeoPackages and logo used by the QPF example
-(``resources/slow_example.py``; source directory overridable with
-``SWRCC_RESOURCES``), and snapshots every WPC QPF product the example renders.
-Everything goes to the gitignored fixture directory (``benchmarks/data/``, or
-``$CARTOSTACK_FIXTURE_DIR``) with a ``fixtures.json`` record of sources, sizes,
-and SHA-256 digests.
+Preparing is one-time and network-allowed, and uses public sources only. Copies the
+Natural Earth shapefiles already in the Cartopy cache (downloading any that are missing),
+downloads ``ne_10m_populated_places`` and ``ne_10m_admin_2_counties``, and snapshots
+every WPC QPF product the QPF example renders. Everything goes to the gitignored fixture
+directory (``benchmarks/data/``, or ``$CARTOSTACK_FIXTURE_DIR``) with a ``fixtures.json``
+record of sources, sizes, and SHA-256 digests.
 
 Benchmarks and tests read only that directory and never download; tests skip
 fixture-dependent cases when it is absent (``tests/conftest.py`` imports
@@ -49,25 +46,11 @@ def fixture_dir() -> Path:
 
 DATA = fixture_dir()
 NE_DIR = DATA / "shapefiles" / "natural_earth"  # Cartopy's data_dir layout
-COUNTY_SRC = ROOT / "resources" / "NYS_Shoreline_Counties"
-COUNTY_DST = DATA / "NYS_Shoreline_Counties"
-
-SWRCC_SRC = Path(os.environ.get("SWRCC_RESOURCES", "/Users/danielvanhoesen/swrcc/resources"))
-SWRCC_DST = DATA / "swrcc"
-SWRCC_FILES = [
-    "prepared_gpkg/counties_epsg4326.gpkg",
-    "prepared_gpkg/lakes_epsg4326.gpkg",
-    "prepared_gpkg/cities_epsg4326.gpkg",
-    "prepared_gpkg/nymask_epsg4326.gpkg",
-    "prepared_gpkg/states_epsg4326.gpkg",
-    "prepared_gpkg/coastlines_epsg4326.gpkg",
-    "logos/SWRCC_Logo_Transparent.png",
-]
 QPF_DIR = DATA / "qpf"
 
 SHAPEFILE_EXTS = (".shp", ".shx", ".dbf", ".prj", ".cpg")
 
-# WPC QPF products in the order resources/slow_example.py renders them.
+# WPC QPF products, in the order the QPF example renders them.
 QPF_URLS = [
     "https://ftp-wpc.ncep.noaa.gov/shapefiles/qpf/{}",
     "https://ftp.wpc.ncep.noaa.gov/shapefiles/qpf/{}",
@@ -93,7 +76,7 @@ QPF_PRODUCTS = {
     "1_6hr_f24-f30": "day1/QPF6hr_f24-f30_latest.tar",
 }
 
-# (category, name) of Natural Earth 10m layers copied from the Cartopy cache.
+# (category, name) of Natural Earth 10m layers copied from the Cartopy cache (or downloaded).
 NE_CACHED = [
     ("physical", "ocean"),
     ("physical", "land"),
@@ -105,21 +88,11 @@ NE_CACHED = [
 
 # Natural Earth layers downloaded once. naciscdn is the official CDN; the S3
 # bucket is the one Cartopy itself downloads from.
-NE_DOWNLOADED = [("cultural", "populated_places")]
+NE_DOWNLOADED = [("cultural", "populated_places"), ("cultural", "admin_2_counties")]
 NE_URLS = [
     "https://naciscdn.org/naturalearth/10m/{category}/ne_10m_{name}.zip",
     "https://naturalearth.s3.amazonaws.com/10m_{category}/ne_10m_{name}.zip",
 ]
-
-# Expected SHA-256 of the user-supplied fixture.
-COUNTY_SHA256 = {
-    "NYS Counties.shp": "c3fdde4d0c7f6ef3194f6e92940ff82b93c219393e28f25c4b4cdf7c8ae2ed24",
-    "NYS Counties.shx": "41d740903605db3223085e6ea0844e301f0f81ff2878acc3d90c8802ddf1e362",
-    "NYS Counties.dbf": "f5bdbc93a2f0f64f889cae66e31634b12067dcb5cc41949566cedadd016952b8",
-    "NYS Counties.prj": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
-    "NYS Counties.cpg": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
-    "NYS Counties.qmd": "b29add816be3a45c6f58c18c5f757177b2a96b8e29ae205c0922e5c60e8bf519",
-}
 
 
 def sha256(path: Path) -> str:
@@ -155,6 +128,9 @@ def copy_file(src: Path, dst: Path) -> None:
 def copy_cached_natural_earth(entries: list[dict[str, object]]) -> None:
     cache = cartopy_cache_dir()
     for category, name in NE_CACHED:
+        if not (cache / category / f"ne_10m_{name}.shp").exists():
+            NE_DOWNLOADED.append((category, name))  # not cached here: download it instead
+            continue
         for ext in SHAPEFILE_EXTS:
             src = cache / category / f"ne_10m_{name}{ext}"
             if not src.exists():
@@ -203,29 +179,6 @@ def fetch_zip(category: str, name: str, dst_dir: Path) -> dict[str, object]:
             "downloaded_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         }
     sys.exit(f"could not download ne_10m_{name}")
-
-
-def copy_counties(entries: list[dict[str, object]]) -> None:
-    for fname, expected in COUNTY_SHA256.items():
-        src = COUNTY_SRC / fname
-        if not src.exists():
-            sys.exit(f"missing county fixture: {src}")
-        actual = sha256(src)
-        if actual != expected:
-            sys.exit(f"county fixture hash mismatch for {src}: {actual} != {expected}")
-        dst = COUNTY_DST / fname
-        copy_file(src, dst)
-        entries.append(record(dst, f"resources: {src.relative_to(ROOT)}"))
-
-
-def copy_swrcc(entries: list[dict[str, object]]) -> None:
-    for rel in SWRCC_FILES:
-        src = SWRCC_SRC / rel
-        if not src.exists():
-            sys.exit(f"missing SWRCC resource: {src} (set SWRCC_RESOURCES)")
-        dst = SWRCC_DST / rel
-        copy_file(src, dst)
-        entries.append(record(dst, f"swrcc: {src}"))
 
 
 def snapshot_qpf(entries: list[dict[str, object]]) -> None:
@@ -309,9 +262,7 @@ def main() -> None:
         sys.exit(1 if problems else 0)
     entries: list[dict[str, object]] = []
     copy_cached_natural_earth(entries)
-    copy_counties(entries)
     download_natural_earth(entries)
-    copy_swrcc(entries)
     snapshot_qpf(entries)
     manifest = {
         "prepared_utc": datetime.now(UTC).isoformat(timespec="seconds"),
