@@ -476,7 +476,7 @@ def test_full_canvas_bottom_layer_fast_path_is_exact(opacity: float, placed: boo
     """Starting from a full-canvas bottom layer equals stacking it on a transparent canvas."""
     rng = np.random.default_rng(9)
     px = random_rgba(rng, H, W)
-    px[::3, :, 3] = 0  # transparent pixels with non-zero colour
+    px[::3, :, 3] = 0  # transparent pixels with non-zero color
     px[:, ::4, 3] = 255
     bottom = RasterLayer(id="b", order=0, pixels=px, opacity=opacity,
                          left=1 if placed else 0)  # fmt: skip

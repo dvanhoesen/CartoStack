@@ -54,7 +54,7 @@ version loads lazily.
 
 | Call | Slot kind | Notes |
 | --- | --- | --- |
-| `scene.replace_grid(id, values, *, vmin=None, vmax=None, lut=None)` | grid | `values` has the slot's `(ny, nx)` shape; NaN and masked values take the `bad` colour. `vmin`/`vmax`/`lut` change the colour range or colormap from now on; colorbars drawn from the slot are redrawn. Raises `GridMismatchError`. |
+| `scene.replace_grid(id, values, *, vmin=None, vmax=None, lut=None)` | grid | `values` has the slot's `(ny, nx)` shape; NaN and masked values take the `bad` color. `vmin`/`vmax`/`lut` change the color range or colormap from now on; colorbars drawn from the slot are redrawn. Raises `GridMismatchError`. |
 | `scene.replace_polygons(id, records, values)` | polygon | One entry per polygon: its rings of `(lon, lat)` degrees, plus one value per polygon, classified by the slot's bins. Raises `PolygonDataError`, `ProjectionError`. |
 | `scene.text[id] = "…"`, or `scene.replace_text(id, value)` | text | One line, rendered with the embedded font and laid out the way Matplotlib 3.11 lays it out. Reading `scene.text[id]` returns the current string. Raises `TextFontError`. |
 | `scene.redraw_colorbar(id)`, `scene.stale_colorbars` | colorbar | Redraws happen automatically; `stale_colorbars` lists colorbars that could not be redrawn, either because the file holds no redraw data or because the new range needs an offset or scientific notation. |
@@ -132,9 +132,9 @@ frame=False, crop=None)` creates a figure with one map axes instead.
 | Method | Declares |
 | --- | --- |
 | `add_static(id, *, order, draw=None, artists=(), zorder=None, background=False, opacity=1.0)` | A raster layer of artists: those `draw(ax)` creates, those listed in `artists`, and/or the map-axes artists with `lo <= zorder < hi`. One static layer may take the figure and axes background. |
-| `add_grid_slot(id, *, order, lon, lat, cmap, vmin/vmax or norm, alpha=None, extend="neither", cells="centers", values=None, artists=())` | A grid slot. The pixel→cell index map is made by drawing the grid once with Matplotlib; the colormap LUT is rounded the same way Agg rounds colours. `norm` must be a plain linear `Normalize` without `clip`. |
-| `add_polygon_slot(id, *, order, bins, fallback=None, round_decimals=None, supersample=4, records=None, values=None, artists=())` | A polygon slot. `bins` are `(lower, upper, colour, draw order)` rows. |
-| `add_text_slot(id, artist=None, *, order, **text)` | A text slot from a `Text` artist (font, size, colour, anchor) or from `fig.text` keywords. Its font file is embedded. |
+| `add_grid_slot(id, *, order, lon, lat, cmap, vmin/vmax or norm, alpha=None, extend="neither", cells="centers", values=None, artists=())` | A grid slot. The pixel→cell index map is made by drawing the grid once with Matplotlib; the colormap LUT is rounded the same way Agg rounds colors. `norm` must be a plain linear `Normalize` without `clip`. |
+| `add_polygon_slot(id, *, order, bins, fallback=None, round_decimals=None, supersample=4, records=None, values=None, artists=())` | A polygon slot. `bins` are `(lower, upper, color, draw order)` rows. |
+| `add_text_slot(id, artist=None, *, order, **text)` | A text slot from a `Text` artist (font, size, color, anchor) or from `fig.text` keywords. Its font file is embedded. |
 | `add_colorbar(id, colorbar, *, slot, order)` | A colorbar layer that the runtime can redraw when `slot`'s range or colormap changes. |
 | `build(*, rest=None, encoding="rgba8+zlib", provenance=None)` / `save(path, **kw)` | Renders every layer and returns, or also saves, the `Scene`. |
 
@@ -143,7 +143,7 @@ unless `rest="<static id>"` names a layer to collect them. The builder warns whe
 layer order would draw overlapping artists in a different order than Matplotlib.
 
 **Embedded fonts.** Each text slot embeds the exact font file Matplotlib resolved for
-its artist (DejaVu Sans by default). Make sure the font's licence allows embedding
+its artist (DejaVu Sans by default). Make sure the font's license allows embedding
 before using another font.
 
 ## Limitations (format 1.0)

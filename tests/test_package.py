@@ -54,7 +54,7 @@ def test_network_is_blocked() -> None:
 
 
 def test_no_package_source_is_gitignored() -> None:
-    """Hatchling builds honour .gitignore: an ignored module would be missing from the wheel."""
+    """Hatchling builds honor .gitignore: an ignored module would be missing from the wheel."""
     import shutil
     from pathlib import Path
 

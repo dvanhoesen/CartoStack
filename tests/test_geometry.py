@@ -35,7 +35,7 @@ def test_round_trip_and_fingerprint_are_stable(name: str) -> None:
 
 
 def test_fingerprint_is_pinned() -> None:
-    """Locks the canonicalisation rules of docs/format.md §5.6."""
+    """Locks the canonicalization rules of docs/format.md §5.6."""
     g = CanvasGeometry.from_dict(
         {
             "canvas": {"width": 640, "height": 480, "dpi": 100},

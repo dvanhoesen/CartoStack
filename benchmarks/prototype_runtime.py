@@ -141,7 +141,7 @@ def lcc_constants(p: dict) -> tuple:
 
 
 def lcc_forward(lon, lat, p: dict):
-    """lon/lat (degrees) → projected metres, ellipsoidal LCC with two standard parallels."""
+    """lon/lat (degrees) → projected meters, ellipsoidal LCC with two standard parallels."""
     e, n, a_f, rho0, lam0 = lcc_constants(p)
     rad = np.pi / 180
     phi = np.asarray(lat, np.float64) * rad
@@ -164,7 +164,7 @@ def to_pixels(lon, lat, georef: dict):
 
 
 def classify(values, bins: dict) -> list[tuple[int, int]]:
-    """(bin index, zorder) per record, as the example's colour loop does."""
+    """(bin index, zorder) per record, as the example's color loop does."""
     out = []
     for v in values:
         v = round(v, 2)
@@ -251,7 +251,7 @@ def record_coverage(rings, georef: dict, shape, k: int):
 def render_polygons(rings_per_record, values, slot: dict, georef: dict, shape, k: int = 1):
     """Fill classified polygons in draw order; return straight-alpha RGBA uint8.
 
-    Painter's algorithm over coverage: fully covered pixels take the bin colour,
+    Painter's algorithm over coverage: fully covered pixels take the bin color,
     partly covered ones blend it over what is already there (Agg-like
     anti-aliasing when ``k`` > 1; hard edges when ``k`` == 1).
     """
@@ -343,7 +343,7 @@ def grid_colors(values, slot: dict, lut):
 
 
 def render_grid(values, slot: dict, prep: dict, shape):
-    """Gather cell colours into pixels through the index map."""
+    """Gather cell colors into pixels through the index map."""
     out = np.zeros((*shape, 4), np.uint8)
     cells = grid_colors(values, slot, prep["lut"])
     out.reshape(-1, 4)[prep["pixels"]] = cells[prep["cells"]]

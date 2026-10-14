@@ -6,9 +6,9 @@ Weather and climate maps are often produced on a schedule: the coastlines, borde
 
 The stack can be imagined as transparent sheets: the basemap is drawn ahead of time, and on every run only the data sheet and the title are replaced. Producing a map needs only **NumPy and Pillow**, so it is quick to start, light to install, and never touches Cartopy, shapefiles or Natural Earth data again.
 
-![Speed-up of CartoStack over the standard Matplotlib/Cartopy render](docs/images/speedup_summary.png)
+![Time to make one map in a fresh process: Matplotlib/Cartopy 16.1 s, most of it drawing the static map, versus CartoStack 0.14 s](docs/images/cold_start.png)
 
-On a precipitation-forecast map, one product takes about **0.3 s instead of 12 s**, and the output matches the full Cartopy render to within a few colour levels on more than 99.9 % of pixels.
+Making one map in a fresh Python process (as a scheduled job does), starting from data on disk, takes about **0.14 s instead of 16 s**. 99.9 % of the output's pixels are within 32 of 255 color levels of the full Cartopy render; the largest differences are along text edges. The CartoStack time does not include the one-time step of building the `.cstack` file from the Matplotlib/Cartopy figure (about 18 s for this map, roughly one ordinary render). That step is done once per map layout and reused for every later map. Timings are medians of 5–7 fresh-process runs on an Apple M3 Pro.
 
 ## Install
 
@@ -49,7 +49,7 @@ with Scene.load("temperature.cstack") as scene:
     scene.save_png("temperature_18z.png")
 ```
 
-In addition to gridded data, a map can hold replaceable polygons (such as forecast contours), text, and colorbars that update when the colour range changes. Complete examples are in
+In addition to gridded data, a map can hold replaceable polygons (such as forecast contours), text, and colorbars that update when the color range changes. Complete examples are in
 [`examples/`](examples/README.md).
 
 ## Documentation

@@ -220,7 +220,7 @@ def map_geometry(
 ) -> CanvasGeometry:
     """A small LCC canvas (the QPF projection) whose axes are ``(left, top, width, height)``.
 
-    The projected extent is centred on the projection origin and scaled to the axes, so
+    The projected extent is centered on the projection origin and scaled to the axes, so
     the georeference is consistent by construction.
     """
     left, top, aw, ah = axes if axes is not None else (0.0, 0.0, float(width), float(height))

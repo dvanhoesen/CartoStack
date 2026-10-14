@@ -1,4 +1,4 @@
-"""Colorbars: Matplotlib's tick rules, redraw from parts, Scene behaviour, and Matplotlib checks."""
+"""Colorbars: Matplotlib's tick rules, redraw from parts, Scene behavior, and Matplotlib checks."""
 
 from __future__ import annotations
 
@@ -285,7 +285,7 @@ def test_authored_colorbar_redraw_matches_matplotlib(orientation: str) -> None:
         plt.close(b2.fig)
         strip = r.rows >= 0
         d = np.abs(ours - ref).max(-1)
-        assert (d[strip] > 32).mean() < 0.01  # the colour strip
+        assert (d[strip] > 32).mean() < 0.01  # the color strip
         ink = (ours[..., 3] > 0) | (ref[..., 3] > 0)
         assert abs(ours[..., 3].sum() / ref[..., 3].sum() - 1) < 0.03  # same amount of ink
         yy, xx = np.mgrid[: d.shape[0], : d.shape[1]]

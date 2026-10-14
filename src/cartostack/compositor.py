@@ -227,8 +227,8 @@ def encode_png(
 ) -> bytes:
     """Encode an RGBA image as PNG without changing its size.
 
-    ``mode="RGB"`` composites the image over the opaque ``background`` colour
-    first (default white, Matplotlib's default figure colour); an opaque image
+    ``mode="RGB"`` composites the image over the opaque ``background`` color
+    first (default white, Matplotlib's default figure color); an opaque image
     is unchanged by that.
     """
     if mode not in PNG_MODES:

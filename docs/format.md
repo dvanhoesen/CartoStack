@@ -18,9 +18,9 @@ The key words MUST, MUST NOT, SHOULD, and MAY are used as in RFC 2119.
 
 - **Pixel coordinates** are canvas pixels with the origin at the **top-left corner** of the
   top-left pixel and `y` growing downwards. Pixel `(col, row)` covers
-  `[col, col+1) × [row, row+1)`, and its centre is `(col + 0.5, row + 0.5)`. Every layer of a
+  `[col, col+1) × [row, row+1)`, and its center is `(col + 0.5, row + 0.5)`. Every layer of a
   file uses the same pixel grid, so pixel `(x, y)` is the same place in every layer.
-- **Colours** are 8-bit RGBA `[r, g, b, a]` with **straight (non-premultiplied) alpha**.
+- **Colors** are 8-bit RGBA `[r, g, b, a]` with **straight (non-premultiplied) alpha**.
 - **Raster arrays** are `(height, width, 4)` `uint8`, row-major, top row first.
 - **Numbers** are JSON numbers. Integers MUST be written without a fraction or exponent
   where this document says *integer*. NaN and infinities are not allowed anywhere.
@@ -77,7 +77,7 @@ specifies `1.0`.
 - A reader MUST reject a file whose MAJOR version differs from the one it implements,
   *before* interpreting anything else (`UnsupportedVersionError`).
 - A reader of `1.x` MUST read any `1.y`. **Minor versions only add optional fields**, with
-  defaults that preserve 1.0 behaviour. Readers MUST ignore unknown fields and SHOULD
+  defaults that preserve 1.0 behavior. Readers MUST ignore unknown fields and SHOULD
   preserve them when rewriting a file.
 - Changing the meaning of an existing field, adding a required field, or adding a layer kind
   or encoding requires a new MAJOR version. A 1.x reader therefore never meets a layer kind
@@ -183,9 +183,9 @@ polygon slots):
   projection's ellipsoid**, with no datum shift. This matches Cartopy's `PlateCarree()` →
   projection pipeline. Data on another datum must be converted beforehand if the difference
   matters at the canvas resolution.
-- `projected_extent` is the axes' extent in projected metres (`xmin < xmax`, `ymin < ymax`),
+- `projected_extent` is the axes' extent in projected meters (`xmin < xmax`, `ymin < ymax`),
   as from Cartopy's `ax.get_extent()`.
-- `world_to_pixel` `[a, b, c, d, e, f]` maps projected metres to continuous canvas pixels:
+- `world_to_pixel` `[a, b, c, d, e, f]` maps projected meters to continuous canvas pixels:
   `col = a·x + b·y + c`, `row = d·x + e·y + f`. It MUST be invertible. (GDAL's
   geotransform is the inverse direction: pixel → world.)
 - **Consistency:** `(xmin, ymax)` MUST map to the axes' top-left corner and `(xmax, ymin)`
@@ -194,11 +194,11 @@ polygon slots):
 ### 5.6 Geometry fingerprint
 
 `geometry_fingerprint` is `"sha256:"` followed by the SHA-256 of the **canonical JSON** of
-the normalised geometry. Readers recompute it and MUST reject a mismatch, which catches a
+the normalized geometry. Readers recompute it and MUST reject a mismatch, which catches a
 geometry edited without re-authoring the layers. Two files can share or exchange layers
 only if their fingerprints are equal.
 
-Normalised geometry: an object with exactly these keys, defaults filled in:
+Normalized geometry: an object with exactly these keys, defaults filled in:
 `canvas` {`width`, `height` as integers; `dpi` as a float}, `axes` {`left`, `top`,
 `width`, `height` as floats}, `clip`, `figure` (`null` or {`width_in`, `height_in`, `dpi`
 as floats; `crop_in` as `null` or 4 floats}), and `georeference` (`null` or {`crs`
@@ -236,7 +236,7 @@ array. Writers SHOULD write `layers` already sorted.
 Start from a fully transparent canvas. For each visible layer in stacking order, multiply
 its alpha by `opacity` and composite it source-over (Porter–Duff, straight alpha) at
 `(left, top)`; parts outside the canvas are discarded. The scaled alpha is
-`floor(alpha · opacity + 0.5)`; colour channels are unchanged. The reference operator is
+`floor(alpha · opacity + 0.5)`; color channels are unchanged. The reference operator is
 Pillow's `Image.alpha_composite`. Implementations MAY differ from it and from a
 single-canvas Matplotlib render by rounding: stacking Agg-rendered layers differs by at
 most 3–5 levels per channel.
@@ -253,7 +253,7 @@ single layers, and slots are always composited exactly. Writers SHOULD store sta
 pre-flattened (§7), which avoids the case.
 
 The output image has the canvas size. Saved as RGB, it is first composited over an opaque
-background colour (the reference runtime defaults to white); an opaque canvas is
+background color (the reference runtime defaults to white); an opaque canvas is
 unchanged by that.
 
 ### 6.3 Encodings
@@ -277,7 +277,7 @@ static content SHOULD be stored pre-flattened into one raster layer (this halves
 load time, and is closer to the single-canvas render). Store them separately only
 when they must be shown, hidden, or reordered independently.
 
-`colorbar`: a raster layer (same requirements) that shows a grid slot's colour scale. It
+`colorbar`: a raster layer (same requirements) that shows a grid slot's color scale. It
 adds `"colorbar": {"slot": "<grid layer id>", "redraw": {...}}`; the slot MUST name a grid
 layer in the same file. The layer's pixels are shown as they are until the slot's `vmin`,
 `vmax`, or LUT changes. A runtime then redraws the colorbar from `redraw` if it is present;
@@ -302,18 +302,18 @@ without it, the colorbar is stale (it no longer matches the slot) until it is re
 All coordinates are pixels in the layer's own frame, and every raster has the layer's size.
 A redraw composites, in order:
 
-1. `under`: what is drawn before the colour strip (typically nothing, as colorbar axes draw
+1. `under`: what is drawn before the color strip (typically nothing, as colorbar axes draw
    no background).
 2. The strip: `rows` (int32, `i32le` or `i32le+zlib`) gives each pixel the LUT row it
    shows: `0…n_colors−1`, then `n_colors` (under) and `n_colors + 1` (over) for the
    extension triangles, and `−1` elsewhere. Pixels take the slot's LUT row with the slot's
-   alpha rule (§8, step 4). If the slot's LUT has another number of colours `N`, a strip
+   alpha rule (§8, step 4). If the slot's LUT has another number of colors `N`, a strip
    pixel at fraction `t` along `box`, from `vmin` to `vmax`, takes row `floor(t · N)`.
 3. `over`: the outline and anything else drawn after the strip, except ticks, tick labels,
    and the axis label.
 4. Tick marks at `box` positions for the tick values (below), on `side`: `length` and
    `width` pixels, pointing `out`, `in`, or both (`inout`), in `color`, with the mark
-   centred on the pixel centre at or left of (below) the exact position.
+   centered on the pixel center at or left of (below) the exact position.
 5. Tick labels: one-line text (§10, `layout: "matplotlib"`, from the `font` member)
    anchored `length` (for `out`; half for `inout`; 0 for `in`) plus `pad` pixels outward
    from the box edge. Horizontal colorbars use `ha: center` with `va: top` (bottom side)
@@ -355,10 +355,10 @@ map says which grid cell each pixel shows.
 - `index_map`: an `int32` array of the layer's `height × width`. The value is the cell index
   shown at that pixel, or `−1` for no data. Pixels outside the clip region (§5.3) MUST be
   `−1`. `cells` (`centers` | `edges`, default `centers`) records whether the authoring
-  coordinates were cell centres or edges; it is informational, since the mapping is fully in
+  coordinates were cell centers or edges; it is informational, since the mapping is fully in
   the index map. Index maps are produced at build time by the index-image method: draw the
-  mesh with per-cell colours encoding `k`, with anti-aliasing off.
-- **Values → colours.** These are Matplotlib's `Normalize` and `Colormap.__call__` rules,
+  mesh with per-cell colors encoding `k`, with anti-aliasing off.
+- **Values → colors.** These are Matplotlib's `Normalize` and `Colormap.__call__` rules,
   reproduced exactly. Values are an array of shape `shape` with a real numeric type,
   converted to `value_dtype` (default `float32`); NaN and masked values are *bad*.
   1. `x = value − vmin`, then `x = x / (vmax − vmin)`. Each step is computed in float64
@@ -369,15 +369,15 @@ map says which grid cell each pixel shows.
   3. The row is `under` (`n_colors`) if `x < 0`, `over` (`n_colors + 1`) if
      `x ≥ n_colors`, `bad` (`n_colors + 2`) if the value is bad, otherwise `trunc(x)`.
      A bad value takes `bad` even when it is also out of range.
-  4. The colour is LUT row `row`. If `alpha` is not `null`, replace the alpha channel by
-     `floor(alpha · 255 + 0.5)`, except that a `bad` colour whose four channels are all
+  4. The color is LUT row `row`. If `alpha` is not `null`, replace the alpha channel by
+     `floor(alpha · 255 + 0.5)`, except that a `bad` color whose four channels are all
      zero stays `(0, 0, 0, 0)` (Matplotlib ignores alpha for it).
 - `colormap`: the LUT member decodes (`rgba8` or `rgba8+zlib`) to `n_colors + 3` RGBA rows,
-  i.e. `(n_colors + 3) × 4` bytes: `n_colors` colours followed by the `under`, `over`, and
-  `bad` colours. `extend` (`neither|min|max|both`, default
-  `neither`) only affects colorbars; `under` and `over` colours are always applied.
+  i.e. `(n_colors + 3) × 4` bytes: `n_colors` colors followed by the `under`, `over`, and
+  `bad` colors. `extend` (`neither|min|max|both`, default
+  `neither`) only affects colorbars; `under` and `over` colors are always applied.
   Writers authoring from Matplotlib SHOULD store `round(c · 255)` per channel, as Agg
-  rounds colours when it draws a mesh, rather than `cmap(..., bytes=True)`, which
+  rounds colors when it draws a mesh, rather than `cmap(..., bytes=True)`, which
   truncates (truncation puts most pixels one level off the rendered map).
 - Pixels with index `−1` are transparent.
 - **Runtime changes.** A runtime MAY change `vmin`, `vmax`, and the LUT (including
@@ -419,7 +419,7 @@ example WPC QPF contours. It requires `geometry.georeference` with a supported p
   with the **even-odd rule** over all of its rings, so holes and islands inside holes follow
   from the rule and no ring nesting information is needed.
 - **Samples.** With `supersample = k` (1–8; default 1), every pixel holds `k × k` samples
-  at the centres of a `k`-times finer grid: sample `(i, j)` is at
+  at the centers of a `k`-times finer grid: sample `(i, j)` is at
   `((i + 0.5) / k, (j + 0.5) / k)` pixels. A sample is **inside** a record when an odd
   number of the record's edges cross the sample's horizontal line at or to the left of the
   sample. An edge from `(x0, y0)` to `(x1, y1)` crosses that line when the sample's `y` lies
@@ -427,12 +427,12 @@ example WPC QPF contours. It requires `geometry.georeference` with a supported p
   half-open rule counts a shared vertex once and ignores horizontal edges. A sample exactly
   on a left edge is inside and one exactly on a right edge is outside, so polygons that
   share an edge do not overlap.
-- **Clipping.** A sample is never inside when its centre lies outside the clip region
+- **Clipping.** A sample is never inside when its center lies outside the clip region
   (§5.3) or outside the layer's placed box: it must satisfy `left ≤ x < right` and
   `top ≤ y < bottom`.
 - **Compositing.** A pixel's coverage is its count `c` of inside samples out of `k²`. The
-  record contributes the bin colour with alpha `floor(a · c / k² + 0.5)`, where `a` is the
-  colour's alpha. That contribution is composited source-over onto the slot's earlier
+  record contributes the bin color with alpha `floor(a · c / k² + 0.5)`, where `a` is the
+  color's alpha. That contribution is composited source-over onto the slot's earlier
   records with the §6.2 operator (Pillow's integer `alpha_composite`), starting from a
   fully transparent layer. `k = 1` gives hard edges.
 - **Choosing `k`.** Writers SHOULD use `supersample: 4` for maps compared with
@@ -504,12 +504,12 @@ Matplotlib's layout rule so it lines up with text authored in Matplotlib.
 **Measured against Matplotlib 3.11.2.** DejaVu Sans, Oblique and Bold at
 11–58 px, all four `va` values with `ha` left, center and right, fractional anchors,
 plain, kerned (`AVATAR To Ty Wo …`) and ligature (`office flight affine`) strings.
-Placement, measured as the shift of the ink's centre of mass, is within 0.02 px
+Placement, measured as the shift of the ink's center of mass, is within 0.02 px
 horizontally (one 0.22 px case among the kerned strings) and 0.006 px vertically. The
 remaining differences are anti-aliasing. The reference runtime renders each glyph with
 FreeType at a whole pixel and shifts it by the sub-pixel remainder with bilinear
 interpolation, because Pillow cannot render at fractional positions, whereas FreeType in
-Matplotlib rasterises the outline at the fractional position. Of the pixels either
+Matplotlib rasterizes the outline at the fractional position. Of the pixels either
 render inks, 11–14 % (median) differ by more than 32 levels at 30–58 px and 21–27 % at
 11–17 px. The worst single pixel is about 80–95 levels, and the ink box is 1 px wider.
 Not reproduced: contextual alternates, mark positioning, and ligature glyphs without a

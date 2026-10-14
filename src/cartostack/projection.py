@@ -1,11 +1,11 @@
-"""Longitude/latitude → projected metres → canvas pixels, with NumPy only.
+"""Longitude/latitude → projected meters → canvas pixels, with NumPy only.
 
 The runtime projects polygon-slot input itself instead of depending on pyproj
 (``docs/format.md`` §5.5). Format 1.0 supports one projection, ``lcc``: the
 ellipsoidal Lambert Conformal Conic with two standard parallels (Snyder 1987,
 "Map Projections: A Working Manual", eq. 15-1 to 15-10; one standard parallel
 when ``lat_1 == lat_2``). Results match PROJ's ``+proj=lcc`` to well under a
-millimetre (``tests/test_projection.py``).
+millimeter (``tests/test_projection.py``).
 
 Input longitudes and latitudes are geodetic degrees on the projection's
 ellipsoid, with no datum shift. Longitudes are reduced to within 180° of
@@ -83,7 +83,7 @@ def _lcc(projection: Projection) -> _LCC:
 
 
 def forward(projection: Projection, lon: ArrayLike, lat: ArrayLike) -> tuple[Float64, Float64]:
-    """Project geodetic degrees to projected metres ``(x, y)``.
+    """Project geodetic degrees to projected meters ``(x, y)``.
 
     Raises ``ProjectionError`` for an unsupported projection, non-finite input,
     latitudes outside [-90, 90], or points at the pole opposite the cone's apex
@@ -122,7 +122,7 @@ def forward(projection: Projection, lon: ArrayLike, lat: ArrayLike) -> tuple[Flo
 def to_pixels(georef: Georeference, lon: ArrayLike, lat: ArrayLike) -> tuple[Float64, Float64]:
     """Project geodetic degrees to continuous canvas pixels ``(col, row)``.
 
-    Pixel edges lie at integers and centres at half-integers (``docs/format.md`` §5.5).
+    Pixel edges lie at integers and centers at half-integers (``docs/format.md`` §5.5).
     """
     x, y = forward(georef.projection, lon, lat)
     a, b, c, d, e, f = georef.world_to_pixel

@@ -102,10 +102,10 @@ class Projection:
 
 @dataclass(frozen=True)
 class Georeference:
-    """CRS, projected extent, and the affine from projected metres to canvas pixels.
+    """CRS, projected extent, and the affine from projected meters to canvas pixels.
 
     ``world_to_pixel`` is ``(a, b, c, d, e, f)`` with ``col = a*x + b*y + c`` and
-    ``row = d*x + e*y + f``; pixel centres are at half-integers.
+    ``row = d*x + e*y + f``; pixel centers are at half-integers.
     """
 
     proj4: str

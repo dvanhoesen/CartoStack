@@ -225,7 +225,7 @@ CASES: list[tuple[str, str, Mutation, str, bool]] = [
         False,
     ),
     (
-        "bin colour out of range",
+        "bin color out of range",
         "qpf",
         _set(["layers", 1, "polygon", "bins", 0, "color"], [256, 0, 0, 255]),
         "color[0]",

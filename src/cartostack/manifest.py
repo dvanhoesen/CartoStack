@@ -114,7 +114,7 @@ class ColorbarRedrawRecord:
 
 @dataclass(frozen=True)
 class ColorbarLayer(Layer):
-    slot: str  # the grid slot whose normalisation and colormap it shows
+    slot: str  # the grid slot whose normalization and colormap it shows
     redraw: ColorbarRedrawRecord | None = None
 
 

@@ -2,7 +2,7 @@
 
 A cron-style job: load the file once, then for each input swap in the values and the
 subtitle, and write a PNG. Everything else in the map (background, borders, title,
-colorbar) is reused as stored. ``--vmin``/``--vmax`` change the colour range; the
+colorbar) is reused as stored. ``--vmin``/``--vmax`` change the color range; the
 colorbar is redrawn to match.
 
 Inputs are ``.npy`` files holding the grid's values (``(ny, nx)``, the shape the slot was
@@ -31,8 +31,8 @@ def main() -> None:
     parser.add_argument("--slot", default="temperature", help="the grid slot to update")
     parser.add_argument("--text", default="subtitle", help="the text slot to update")
     parser.add_argument("--subtitle", default="Valid {name}", help="subtitle template")
-    parser.add_argument("--vmin", type=float, help="new colour range minimum")
-    parser.add_argument("--vmax", type=float, help="new colour range maximum")
+    parser.add_argument("--vmin", type=float, help="new color range minimum")
+    parser.add_argument("--vmax", type=float, help="new color range maximum")
     args = parser.parse_args()
 
     args.out.mkdir(parents=True, exist_ok=True)

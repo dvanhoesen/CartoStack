@@ -23,7 +23,7 @@ Stages (each in its own process; this orchestrator needs only the standard libra
 4. **Runtime** in the core venv, in isolated mode (``python -I``), from the sandbox: an
    audit hook records every file opened and refuses every network call (``socket.*``,
    ``urllib.Request``). It renders all 18 QPF products, the grid's 4 variants, a grid
-   normalisation change (colorbar redraw), an added layer, then saves, reloads and
+   normalization change (colorbar redraw), an added layer, then saves, reloads and
    re-renders. It then checks ``sys.modules`` and the opened files: anything outside the
    sandbox, the venv and the Python installation fails.
 5. **Compare** (development environment): the runtime PNGs against the full Cartopy

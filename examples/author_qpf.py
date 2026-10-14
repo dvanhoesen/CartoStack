@@ -23,7 +23,7 @@ legend, title bar), here for the Day 1-3 product. The script is not changed: the
 wraps its finished figure and only declares the layers:
 
 * ``below``: everything under the precipitation (zorder < 10), with the background;
-* ``qpf``: the polygon slot, with WPC's bin table (lower, upper, colour, draw order),
+* ``qpf``: the polygon slot, with WPC's bin table (lower, upper, color, draw order),
   a gray fallback, values rounded to 2 decimals, 4x supersampled edges;
 * ``above``: everything else (borders, cities, logo, title bar, legend);
 * ``subtitle``: the valid-time line, as a text slot.
@@ -63,7 +63,7 @@ def main() -> None:
     builder.add_polygon_slot(
         "qpf",
         order=10,
-        bins=bq.QPF_RANGES,  # (lower, upper, colour, zorder) rows
+        bins=bq.QPF_RANGES,  # (lower, upper, color, zorder) rows
         fallback=("gray", 10),
         round_decimals=2,
         artists=figure["data_artists"],  # the drawn polygons become the slot

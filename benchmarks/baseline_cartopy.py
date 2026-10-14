@@ -73,7 +73,7 @@ EXTENT = (-80.5, -71.5, 40.2, 45.3)  # PlateCarree lon0, lon1, lat0, lat1
 # shrinks the map axes, so the resolved rectangle is recorded after drawing.
 AXES_RECT = (0.02, 0.13, 0.96, 0.78)
 CBAR_RECT = (0.2, 0.06, 0.6, 0.025)
-GRID_SHAPE = (500, 500)  # (ny, nx) cell centres
+GRID_SHAPE = (500, 500)  # (ny, nx) cell centers
 GRID_LON = (-81.0, -71.0)
 GRID_LAT = (40.0, 46.0)
 CMAP, VMIN, VMAX, DATA_ALPHA = "coolwarm", -10.0, 35.0, 0.8
@@ -104,7 +104,7 @@ REFERENCE_PNG = ("rgb", 6)  # mode and compress_level of the written image
 def make_field(variant: int = 0):
     """Deterministic analytic temperature-like field (float32, °C).
 
-    Returns (lon, lat, values) with 1-D cell-centre coordinates and values of
+    Returns (lon, lat, values) with 1-D cell-center coordinates and values of
     shape GRID_SHAPE. ``variant`` shifts the waves and the warm anomaly so
     the benchmarks can compare several updated inputs.
     """

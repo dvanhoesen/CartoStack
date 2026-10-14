@@ -71,7 +71,7 @@ CITYLABELXOFFSET = {
     "NYS": {"Manhattan": -0.86, "Buffalo": -0.62, "Default": 0.07},
 }
 
-# (lower, upper, colour, zorder)
+# (lower, upper, color, zorder)
 QPF_RANGES = [
     (0.00, 0.01, "white", 10),
     (0.01, 0.10, "#7fff00", 11),

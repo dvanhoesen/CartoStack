@@ -1,12 +1,12 @@
 """Polygon slots: classified lon/lat polygons → pixels with NumPy (``docs/format.md`` §9).
 
 Input is one *record* per polygon: a value and any number of rings of
-``(lon, lat)`` degrees. Each record's value picks a bin (colour and draw order);
+``(lon, lat)`` degrees. Each record's value picks a bin (color and draw order);
 records are drawn in bin order, each filled with the even-odd rule over all of
 its rings, so holes need no nesting information.
 
 Filling is exact for the format's coverage rule rather than an approximation:
-a pixel holds ``k * k`` sub-pixel samples at the centres of a ``k``-times finer
+a pixel holds ``k * k`` sub-pixel samples at the centers of a ``k``-times finer
 grid, and its coverage is the number of samples inside the record. A sample is
 inside when an odd number of ring edges cross its horizontal line at or to its
 left, counting an edge when the sample lies in ``[min(y0, y1), max(y0, y1))``.
@@ -16,7 +16,7 @@ pixel-resolution difference array, and takes one prefix sum per record. Cost
 grows with the number of crossings (proportional to ``k``) plus the record's
 bounding box at pixel resolution, not with ``k²``.
 
-Coverage becomes alpha ``floor(a · count / k² + 0.5)`` for a bin colour with
+Coverage becomes alpha ``floor(a · count / k² + 0.5)`` for a bin color with
 alpha ``a``, composited source-over onto the earlier records with the same
 integer operator as the compositor (Pillow's ``alpha_composite``). Samples
 outside the clip region (the axes intersected with the canvas and the layer's
@@ -114,7 +114,7 @@ def normalize(records: Iterable[object], values: ArrayLike) -> tuple[list[Record
 def classify(
     slot: PolygonSlot, values: Sequence[float]
 ) -> tuple[NDArray[np.uint8], NDArray[np.int64]]:
-    """Each value's bin colour and draw order (``docs/format.md`` §9, "Classification").
+    """Each value's bin color and draw order (``docs/format.md`` §9, "Classification").
 
     Values are rounded with Python's ``round(value, round_decimals)``; the first bin in
     list order with ``lower <= value < upper`` wins; otherwise the fallback. NaN matches
@@ -138,7 +138,7 @@ def classify(
     return colors[idx], orders[idx]
 
 
-# --- Rasterisation ---------------------------------------------------------------------
+# --- Rasterization ---------------------------------------------------------------------
 
 
 def clip_bounds(slot: PolygonSlot, geometry: CanvasGeometry) -> tuple[float, float, float, float]:
@@ -158,8 +158,8 @@ def clip_bounds(slot: PolygonSlot, geometry: CanvasGeometry) -> tuple[float, flo
 def sample_bounds(clip: tuple[float, float, float, float], k: int) -> tuple[int, int, int, int]:
     """Sub-pixel sample indices inside ``clip``: ``(c0, r0, c1, r1)``, end-exclusive.
 
-    Sample ``i`` has its centre at ``(i + 0.5) / k`` pixels; it is inside when
-    ``left <= centre < right``.
+    Sample ``i`` has its center at ``(i + 0.5) / k`` pixels; it is inside when
+    ``left <= center < right``.
     """
     left, top, right, bottom = clip
     return (
@@ -193,7 +193,7 @@ def coverage(
     nxt[ring_ends - 1] = np.concatenate(([0], ring_ends[:-1]))  # close every ring
     x1, y1 = x[nxt], y[nxt]
     lo, hi = np.minimum(y, y1), np.maximum(y, y1)
-    # Sample rows j (centre j + 0.5) each edge crosses: lo <= j + 0.5 < hi, within the clip.
+    # Sample rows j (center j + 0.5) each edge crosses: lo <= j + 0.5 < hi, within the clip.
     j0 = np.maximum(np.ceil(lo - 0.5), r0)
     j1 = np.minimum(np.ceil(hi - 0.5), r1)
     n = (j1 - j0).astype(np.int64)

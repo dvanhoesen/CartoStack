@@ -135,7 +135,7 @@ def _bin(b: Any, *, bounds: bool = True) -> Bin:
 
 
 def lut_from_cmap(cmap: Any) -> NDArray[np.uint8]:
-    """``(N + 3, 4)`` uint8 LUT: the colours, then under, over, bad.
+    """``(N + 3, 4)`` uint8 LUT: the colors, then under, over, bad.
 
     Channels are rounded to 8 bits as Agg rounds them when it draws (``pcolormesh``),
     not truncated as ``cmap(..., bytes=True)`` does, so runtime grids match rendered maps.
@@ -368,7 +368,7 @@ class SceneBuilder:
     def add_text_slot(
         self, layer_id: str, artist: Any = None, *, order: float, **text: Any
     ) -> SceneBuilder:
-        """A text slot from a Matplotlib ``Text`` artist (its font, size, colour, anchor,
+        """A text slot from a Matplotlib ``Text`` artist (its font, size, color, anchor,
         alignment, and current string), or a new one: ``fig.text(**text)`` with ``x``/``y``
         in figure fractions and the other keywords as for ``Figure.text``."""
         self._check_id(layer_id)

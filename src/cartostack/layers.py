@@ -112,7 +112,7 @@ def owned_lut(lut: ArrayLike) -> RGBA:
     arr = np.asarray(lut)
     if arr.dtype != np.uint8 or arr.ndim != 2 or arr.shape[1] != 4 or arr.shape[0] < 4:
         raise LayerError(
-            "lut must be uint8 with shape (n_colors + 3, 4): colours, then under, over, bad; "
+            "lut must be uint8 with shape (n_colors + 3, 4): colors, then under, over, bad; "
             f"got {arr.dtype} {arr.shape}"
         )
     return arr if _owned(arr) else _readonly(arr)
@@ -170,7 +170,7 @@ class Layer:
             f"{self.id}: order must be a finite number",
         )
         _check(0.0 <= self.opacity <= 1.0, f"{self.id}: opacity must be within 0..1")
-        # Numbers are normalised so equal scenes serialise identically (12 vs 12.0).
+        # Numbers are normalized so equal scenes serialize identically (12 vs 12.0).
         _floats(self, "order", "opacity")
         for name in ("left", "top"):
             value = getattr(self, name)
@@ -215,11 +215,11 @@ TICK_DIRECTIONS: Final = ("out", "in", "inout")
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class ColorbarRedraw:
-    """What a runtime needs to redraw a colorbar for a new normalisation or colormap.
+    """What a runtime needs to redraw a colorbar for a new normalization or colormap.
 
-    Coordinates are pixels in the colorbar layer's own frame. ``box`` is the colour
+    Coordinates are pixels in the colorbar layer's own frame. ``box`` is the color
     strip from ``vmin`` to ``vmax`` along the long axis. ``rows`` maps each pixel of the
-    strip to the LUT row it shows for ``n_colors`` colours: ``0..n_colors-1``, then
+    strip to the LUT row it shows for ``n_colors`` colors: ``0..n_colors-1``, then
     ``n_colors`` (under) and ``n_colors + 1`` (over) for the extension triangles, and
     ``-1`` elsewhere. ``under``/``over`` are the colorbar's pixels drawn before and after
     the strip (axes background; outline and label), without ticks or tick labels.

@@ -1,7 +1,7 @@
 """Grid index maps by the index-image method (``docs/format.md`` §8).
 
 The grid is drawn once with ``pcolormesh`` exactly as a data render would place it, but
-with anti-aliasing off and each cell's face colour encoding its flat index
+with anti-aliasing off and each cell's face color encoding its flat index
 ``j * nx + i`` in 24 bits. Decoding the rendered pixels gives, for every pixel, the cell
 Matplotlib draws there. Pixels that are not fully covered (edges of the axes clip path)
 and pixels outside the clip region become ``-1``.
@@ -51,11 +51,11 @@ def index_map(
 ) -> tuple[NDArray[np.int32], int]:
     """``(index_map, partial_pixels)`` for a grid drawn on ``ax``, at the saved size.
 
-    ``lon``/``lat`` are geodetic degrees (``PlateCarree``): 1-D or 2-D cell centres
+    ``lon``/``lat`` are geodetic degrees (``PlateCarree``): 1-D or 2-D cell centers
     (``cells="centers"``, ``shading="nearest"``) or cell edges (``cells="edges"``,
     ``shading="flat"``). ``hide`` lists artists to hide while drawing (everything else
     already on the figure). ``clip`` is the clip region ``(left, top, right, bottom)`` in
-    canvas pixels; pixels whose centre lies outside it become ``-1``.
+    canvas pixels; pixels whose center lies outside it become ``-1``.
     """
     import cartopy.crs as ccrs
     import matplotlib.pyplot as plt

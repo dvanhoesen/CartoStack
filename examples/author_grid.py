@@ -4,10 +4,10 @@ Draws an ordinary Cartopy figure, then tells ``SceneBuilder`` which parts become
 layers:
 
 * ``below``: background, ocean, land and lakes (everything under the data);
-* ``temperature``: a grid slot; the runtime colours new values with the stored index map,
-  normalisation and colormap;
+* ``temperature``: a grid slot; the runtime colors new values with the stored index map,
+  normalization and colormap;
 * ``above``: coastline, borders and the title;
-* ``colorbar``: redrawn by the runtime when the colour range changes;
+* ``colorbar``: redrawn by the runtime when the color range changes;
 * ``subtitle``: a text slot, re-rendered with the embedded font.
 
 It also writes a few sample inputs (``.npy``) for ``update_grid.py``. Natural Earth
@@ -28,7 +28,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 NATURAL_EARTH = ROOT / "benchmarks" / "data" / "shapefiles" / "natural_earth"
 EXTENT = (-80.5, -71.5, 40.2, 45.3)  # lon0, lon1, lat0, lat1
-SHAPE = (300, 300)  # (ny, nx) cell centres
+SHAPE = (300, 300)  # (ny, nx) cell centers
 LON = np.linspace(EXTENT[0] - 0.5, EXTENT[1] + 0.5, SHAPE[1])
 LAT = np.linspace(EXTENT[2] - 0.5, EXTENT[3] + 0.5, SHAPE[0])
 

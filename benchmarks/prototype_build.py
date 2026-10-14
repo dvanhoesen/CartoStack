@@ -107,7 +107,7 @@ def render_groups(fig, members: dict, groups: list[str], bbox_in, dpi, backgroun
 
 
 def affine_from(ax, scale: float, offset_px: tuple[float, float], height_px: float) -> list[float]:
-    """Projected metres → output pixels (top-left origin), from ax.transData."""
+    """Projected meters → output pixels (top-left origin), from ax.transData."""
     import numpy as np
 
     pts = np.array([[0.0, 0.0], [1e5, 0.0], [0.0, 1e5]])
@@ -149,7 +149,7 @@ def check_lcc(ax, lcc: dict) -> float:
 
 
 def text_slot(artist, scale, offset_px, height_px, dy: float) -> dict:
-    """Text slot record: anchor in output pixels, font, size, colour, alignment."""
+    """Text slot record: anchor in output pixels, font, size, color, alignment."""
     from matplotlib import colors as mcolors
     from matplotlib import font_manager
 
@@ -275,7 +275,7 @@ def build_grid() -> dict:
     layers = render_groups(fig, members, ["below", "above", "data", "subtitle"], None, bc.DPI,
                            background_group="below")
 
-    # Index-image method: same mesh geometry, face colours encode the flat cell index.
+    # Index-image method: same mesh geometry, face colors encode the flat cell index.
     lon, lat, _ = bc.make_field(0)
     ny, nx = bc.GRID_SHAPE
     idx = np.arange(ny * nx)

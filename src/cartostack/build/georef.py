@@ -96,7 +96,7 @@ def _projection(ax: Any) -> tuple[Projection, str, str | None]:
 
 
 def georeference(ax: Any, to_canvas: Callable[[np.ndarray], np.ndarray]) -> Georeference:
-    """CRS, projected extent and the projected-metres → canvas-pixel affine of a GeoAxes."""
+    """CRS, projected extent and the projected-meters → canvas-pixel affine of a GeoAxes."""
     projection, proj4, wkt = _projection(ax)
     xmin, xmax, ymin, ymax = (float(v) for v in ax.get_extent())
     span = max(xmax - xmin, ymax - ymin)

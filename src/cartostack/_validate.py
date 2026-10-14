@@ -156,7 +156,7 @@ def numbers(p: Problems, path: str, value: object, length: int) -> tuple[float, 
 
 
 def color(p: Problems, path: str, value: object) -> tuple[int, int, int, int] | None:
-    """An 8-bit straight-alpha RGBA colour ``[r, g, b, a]``."""
+    """An 8-bit straight-alpha RGBA color ``[r, g, b, a]``."""
     if value is MISSING:  # already reported by get()
         return None
     items = array(p, path, value, length=4)

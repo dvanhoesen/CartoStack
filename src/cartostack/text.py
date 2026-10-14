@@ -18,7 +18,7 @@ authored in Matplotlib does:
   glyphs as source-over, as Agg draws each glyph in turn.
 
 The layer holds only the text's pixels, cropped to the ink and to the canvas, in
-straight alpha: the colour with alpha ``round(coverage · a)``.
+straight alpha: the color with alpha ``round(coverage · a)``.
 
 Fonts come only from the scene's embedded assets. A missing or unreadable font is an
 error (``TextFontError``); there is never a fallback to another font.
@@ -41,7 +41,7 @@ from . import _opentype
 from .errors import CartoStackError
 from .layers import RGBA, TextSlot
 
-#: Pen positions are quantised like HarfBuzz/FreeType 26.6 fixed point.
+#: Pen positions are quantized like HarfBuzz/FreeType 26.6 fixed point.
 SUBPIXEL: Final = 64
 
 

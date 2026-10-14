@@ -1,10 +1,10 @@
 """Grid slots: new values → pixels through the stored index map and LUT (``docs/format.md`` §8).
 
 Nothing is projected at runtime. Each pixel's grid cell is fixed by the slot's
-``index_map`` (``-1``: no data), so a render is a normalisation and colour lookup
+``index_map`` (``-1``: no data), so a render is a normalization and color lookup
 per cell followed by one gather per pixel.
 
-Values are coloured with Matplotlib's ``Normalize`` and ``Colormap.__call__``
+Values are colored with Matplotlib's ``Normalize`` and ``Colormap.__call__``
 rules, reproduced exactly (``tests/test_grids.py`` compares them with Matplotlib):
 
 1. Values are converted to the slot's ``value_dtype``. ``x = value - vmin`` and then
@@ -15,7 +15,7 @@ rules, reproduced exactly (``tests/test_grids.py`` compares them with Matplotlib
 3. The LUT row is ``under`` (``x < 0``), ``over`` (``x >= n_colors``), ``bad`` (NaN or
    masked), else ``trunc(x)``.
 4. With a slot ``alpha``, the alpha channel becomes ``floor(alpha * 255 + 0.5)``,
-   except that an all-zero ``bad`` colour stays fully transparent (Matplotlib ignores
+   except that an all-zero ``bad`` color stays fully transparent (Matplotlib ignores
    alpha for it).
 """
 
@@ -85,7 +85,7 @@ def lut_rows(slot: GridSlot, values: ArrayLike) -> NDArray[np.intp]:
 
 
 def cell_colors(slot: GridSlot, values: ArrayLike) -> RGBA:
-    """RGBA colour of every cell, ``(ny * nx, 4)`` uint8."""
+    """RGBA color of every cell, ``(ny * nx, 4)`` uint8."""
     lut = np.array(slot.lut)
     if slot.alpha is not None:
         bad = lut[-1].copy()

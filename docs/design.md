@@ -12,7 +12,7 @@ few parts change: the data, a subtitle or valid time, and sometimes a colorbar.
 
 A typical Matplotlib/Cartopy script still rebuilds everything on every run. It imports large
 libraries, reads shapefiles and Natural Earth data, projects geometries, builds artists and
-rasterises the same borders again. That work usually costs far more than drawing the new data.
+rasterizes the same borders again. That work usually costs far more than drawing the new data.
 
 ## The idea
 
@@ -23,7 +23,7 @@ CartoStack splits map making into two stages.
 ```text
 existing Matplotlib/Cartopy figure
         ↓  SceneBuilder assigns each artist to a layer
-RGBA layers + grid index maps + colour tables + text settings + fonts + georeference
+RGBA layers + grid index maps + color tables + text settings + fonts + georeference
         ↓
 map.cstack
 ```
@@ -32,7 +32,7 @@ map.cstack
 
 ```text
 map.cstack ──► load and verify
-new grid values ──► index-map lookup → normalise → colour table ──► grid layer
+new grid values ──► index-map lookup → normalize → color table ──► grid layer
 new polygons    ──► project (NumPy) → fill by value bin           ──► polygon layer
 new text        ──► Pillow with the embedded font                 ──► text layer
                               ↓
@@ -61,15 +61,15 @@ whose pixels the runtime regenerates from new data.
 | Layer | Stored in the file | Runtime work |
 | --- | --- | --- |
 | Static raster | RGBA pixels (basemap, borders, labels, logo, legend) | None; reused as is |
-| Grid slot | Which grid cell each pixel shows, the colour range and a colour table | Look up each pixel's value, normalise it and colour it |
-| Polygon slot | Value bins with colours, and the map projection | Project lon/lat rings with NumPy and fill them by bin |
-| Text slot | Font, size, colour, anchor, and the font file | Lay out one line as Matplotlib would and draw it with Pillow |
-| Colorbar | Its pixels plus the parts needed to redraw it | Redraw ticks and colours when a grid's range or colours change |
+| Grid slot | Which grid cell each pixel shows, the color range and a color table | Look up each pixel's value, normalize it and color it |
+| Polygon slot | Value bins with colors, and the map projection | Project lon/lat rings with NumPy and fill them by bin |
+| Text slot | Font, size, color, anchor, and the font file | Lay out one line as Matplotlib would and draw it with Pillow |
+| Colorbar | Its pixels plus the parts needed to redraw it | Redraw ticks and colors when a grid's range or colors change |
 
 **Grid slots** avoid projecting anything at runtime. While building, CartoStack draws the
 grid once with Matplotlib and records which cell lands in each pixel (an *index map*).
-Rendering new values is then one array lookup followed by the same normalisation and colour
-rounding Matplotlib uses, so the colours match the full render.
+Rendering new values is then one array lookup followed by the same normalization and color
+rounding Matplotlib uses, so the colors match the full render.
 
 **Polygon slots** handle classified shapes such as WPC precipitation contours. The runtime
 projects their lon/lat rings with a NumPy implementation of the Lambert Conformal Conic
@@ -92,7 +92,7 @@ The speed comes from work the runtime skips: no heavy imports, no reading of geo
 sources, no projecting of static geometry, no artist construction and no redrawing of
 unchanged layers.
 
-![Speed-up of CartoStack over the standard Matplotlib/Cartopy render](images/speedup_summary.png)
+![Time to make one map in a fresh process: Matplotlib/Cartopy 16.1 s, most of it drawing the static map, versus CartoStack 0.14 s](images/cold_start.png)
 
 | Workload (data on disk, Apple M3 Pro) | Matplotlib/Cartopy | CartoStack | Speed-up |
 | --- | --- | --- | --- |
@@ -103,8 +103,10 @@ unchanged layers.
 
 What remains for each product is process start-up, loading the file, rendering the changed
 layers, compositing and PNG encoding. PNG encoding is now one of the largest costs. The QPF
-output matches the full Cartopy render to within 8 colour levels on all but 0.07 % of pixels.
-`benchmarks/report.py` regenerates these figures from the benchmark scripts' results.
+output matches the full Cartopy render to within 8 color levels on all but 0.07 % of pixels.
+These times exclude building the `.cstack` file, which is done once per map layout and
+takes about as long as one ordinary render (18 s for the temperature map, 12 s for QPF).
+`benchmarks/report.py` regenerates the figure and numbers from the benchmark results.
 
 ## Reliability
 
@@ -121,7 +123,7 @@ output matches the full Cartopy render to within 8 colour levels on all but 0.07
 
 CartoStack is for fixed-layout production maps. It does not try to:
 
-- serialise arbitrary live Matplotlib figures or keep every artist editable;
+- serialize arbitrary live Matplotlib figures or keep every artist editable;
 - replace Matplotlib or Cartopy, or be a general plotting library;
 - resize or reproject a file after it is built (build a new one instead);
 - support interactive pan and zoom.
@@ -130,7 +132,7 @@ CartoStack is for fixed-layout production maps. It does not try to:
 
 Possible later work, each only if profiling shows it is worth it:
 
-- more polygon projections and more grid types (log or boundary colour ranges, interpolation);
+- more polygon projections and more grid types (log or boundary color ranges, interpolation);
 - contour, point and vector slots, such as stations or warning polygons;
 - lazy loading, faster PNG encoding and long-lived worker processes;
 - native kernels for compositing or grid rendering, tiling, and GPU backends.

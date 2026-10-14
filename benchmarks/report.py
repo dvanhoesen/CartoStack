@@ -765,6 +765,61 @@ def fig_accuracy(records, out: Path, stamp: str) -> list[str]:
     return sources
 
 
+# The README figure groups the phases into four plain-language parts.
+README_PARTS = (
+    ("Start-up and imports", ("startup",)),
+    ("Read map files", ("load",)),
+    ("Draw the static map (basemap, borders, labels)", ("static",)),
+    ("Draw data and text, save PNG", ("read_input", "data", "text", "composite", "encode", "other")),
+)
+
+
+def fig_readme_cold(records, out: Path) -> None:
+    """README figure: the grid map's cold product, split into broad parts, with no footer."""
+    base = pick(records, "cartopy-baseline", "grid", "cold-process")
+    pkg = pick(records, "package", "grid", "cold-process")
+    if base is None or pkg is None:
+        SKIPPED.append("readme_cold_start.png: needs the grid baseline and package cold runs")
+        return
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    ax.set_axisbelow(True)
+    rows = [("Matplotlib/Cartopy", base), ("CartoStack", pkg)]
+    base_total = run_totals(base)["median"]
+    for y, (label, rec) in zip((1, 0), rows, strict=True):
+        phases = median_phases(rec)
+        scale = run_totals(rec)["median"] / sum(phases.values())  # parts sum to the median total
+        left = 0.0
+        for color, (_, keys) in zip(SLOTS, README_PARTS, strict=False):
+            width = sum(phases[k] for k in keys) * scale
+            if width > 0:
+                ax.barh(y, width, left=left, height=0.56, color=color, edgecolor=SURFACE, linewidth=2)
+            if keys == ("static",) and width > base_total * 0.3:
+                ax.text(left + width / 2, y, f"Draw the static map: {width:.1f} s", ha="center",
+                        va="center", fontsize=10, color=INK, fontweight="bold")
+            left += width
+        total = run_totals(rec)["median"]
+        text = f"{total:.1f} s" if rec is base else f"{total:.2f} s  ·  {base_total / total:.0f}× faster  ·  no static map to draw"
+        ax.text(left + base_total * 0.012, y, text, va="center", fontsize=11, color=INK, fontweight="bold")
+    ax.set_yticks([1, 0], [r[0] for r in rows], fontsize=11, color=INK)
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlim(0, base_total * 1.12)
+    ax.set_xticks(np.arange(0, base_total * 1.12, 4))
+    ax.set_ylim(-0.55, 1.55)
+    ax.set_xlabel("Seconds to make one map in a fresh Python process (median)", fontsize=9.5)
+    ax.grid(axis="y", visible=False)
+    ax.spines["left"].set_visible(False)
+    handles = [Patch(color=c, label=name) for c, (name, _) in zip(SLOTS, README_PARTS, strict=False)]
+    fig.legend(handles=handles, loc="upper left", ncol=4, bbox_to_anchor=(0.012, 0.83), fontsize=8.5,
+               handlelength=1.2, columnspacing=1.4)
+    fig.suptitle("Cold start: Matplotlib/Cartopy versus CartoStack, one product per process",
+                 x=0.012, y=0.97, ha="left", fontsize=13, fontweight="bold")
+    fig.text(0.012, 0.865, "A 1200 × 800 px temperature map, starting from data on disk", ha="left",
+             va="center", fontsize=9.5, color=INK_2)
+    fig.tight_layout(rect=(0, 0, 1, 0.76))
+    fig.savefig(out / "readme_cold_start.png", dpi=200)
+    plt.close(fig)
+
+
 def fig_speedups(rows, out: Path, stamp: str, sources: list[str]) -> None:
     labels = list(dict.fromkeys(r["label"] for r in rows))
     fig, ax = plt.subplots(figsize=(11, 0.75 * len(labels) + 1.8))
@@ -843,6 +898,7 @@ def write_index(out: Path, stamp: str, inputs: dict, records, rows, checks) -> N
              "(extra PNG encodes, output hashing) and process exit, for every series alike.", "",
              "## Figures", "",
              "- `speedup_summary.png`: speed-up by workload and mode (cold, loop, warm kept separate).",
+             "- `readme_cold_start.png`: the README figure (grid map, one product per fresh process; no footer).",
              "- `cold_phases.png`: one product per fresh process; total time and where it goes.",
              "- `qpf_loop_cumulative.png`: 18 QPF products in one process, cumulative time.",
              "- `qpf_time_vs_polygons.png`: per-product cost against polygon count.",
@@ -930,6 +986,7 @@ def main() -> None:
     fig_accuracy(records, out, stamp)
     fig_speedups(rows, out, stamp, sources)
     fig_components(records, out, stamp)
+    fig_readme_cold(records, out)
     write_index(out, stamp, inputs, records, rows, checks)
     (out / "report.json").write_text(json.dumps({
         "schema": SCHEMA, "created_utc": stamp, "inputs": {k: rel(v) for k, v in inputs.items()},

@@ -1,11 +1,11 @@
-"""Colorbars redrawn for a new normalisation or colormap, with NumPy and Pillow.
+"""Colorbars redrawn for a new normalization or colormap, with NumPy and Pillow.
 
 A colorbar layer with ``redraw`` data (``docs/format.md`` §7) is redrawn from parts:
 
-1. ``under``: what Matplotlib draws before the colour strip (the axes background);
-2. the strip: each pixel's LUT row (``rows``) coloured from the grid slot's current LUT
+1. ``under``: what Matplotlib draws before the color strip (the axes background);
+2. the strip: each pixel's LUT row (``rows``) colored from the grid slot's current LUT
    and alpha. The bands do not depend on ``vmin``/``vmax``; a LUT with a different
-   number of colours re-bands the strip by position along it;
+   number of colors re-bands the strip by position along it;
 3. ``over``: outline, extension outlines, and the axis label;
 4. ticks and tick labels for the new range: Matplotlib's ``MaxNLocator``
    (``AutoLocator``) and ``ScalarFormatter`` reproduced exactly, labels drawn with the
@@ -38,7 +38,7 @@ MIN_N_TICKS: Final = 2
 
 
 class ColorbarRedrawError(CartoStackError, ValueError):
-    """The colorbar cannot be redrawn for this normalisation."""
+    """The colorbar cannot be redrawn for this normalization."""
 
 
 # --- Ticks: matplotlib.ticker.MaxNLocator ------------------------------------------------
@@ -211,7 +211,7 @@ def visible_ticks(
 
 
 def _strip(r: ColorbarRedraw, slot: GridSlot) -> RGBA:
-    """The colour strip in the slot's current LUT and alpha."""
+    """The color strip in the slot's current LUT and alpha."""
     n = slot.n_colors
     rows = r.rows
     if n != r.n_colors:  # re-band by position along the strip
@@ -249,7 +249,7 @@ def _tick_marks(r: ColorbarRedraw, positions: NDArray[np.float64], shape: tuple[
     ]
     rings = []
     for p in positions:
-        c = math.floor(p) + 0.5  # odd-width strokes snap to pixel centres
+        c = math.floor(p) + 0.5  # odd-width strokes snap to pixel centers
         if r.side == "bottom":
             y0 = top + height
             rings.append(
@@ -382,7 +382,7 @@ def _labels(
 
 
 def render(layer: ColorbarLayer, slot: GridSlot, font: bytes | None) -> RGBA:
-    """New pixels for ``layer`` showing ``slot``'s current normalisation and colormap."""
+    """New pixels for ``layer`` showing ``slot``'s current normalization and colormap."""
     r = layer.redraw
     if r is None:
         raise ColorbarRedrawError(f"{layer.id}: the file holds no redraw data for this colorbar")

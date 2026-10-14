@@ -3,7 +3,7 @@
 Layers are immutable; every edit builds the new layer list, validates it against
 the scene's geometry, and only then swaps it in, so a failed edit leaves the scene
 unchanged. Untouched layer objects are kept as they are (no decode, copy, or
-re-encode), which is also how the compositor recognises unchanged runs.
+re-encode), which is also how the compositor recognizes unchanged runs.
 """
 
 from __future__ import annotations
@@ -373,9 +373,9 @@ class Scene:
         """Render new values into grid slot ``layer_id``; return the new slot.
 
         ``values`` must have the slot's ``shape`` ``(ny, nx)`` and a real numeric dtype;
-        NaN and masked values take the ``bad`` colour (``docs/format.md`` §8). ``vmin``,
-        ``vmax`` and ``lut`` (``(n_colors + 3, 4)`` uint8: colours, then under, over,
-        bad) change the normalisation or colormap for this and later renders; colorbars
+        NaN and masked values take the ``bad`` color (``docs/format.md`` §8). ``vmin``,
+        ``vmax`` and ``lut`` (``(n_colors + 3, 4)`` uint8: colors, then under, over,
+        bad) change the normalization or colormap for this and later renders; colorbars
         drawn from this slot are redrawn when the file holds their redraw data, and are
         otherwise listed in ``stale_colorbars`` until they are replaced. Only this slot
         (and such colorbars) is re-rendered; on any error (``GridMismatchError``,
@@ -425,7 +425,7 @@ class Scene:
         return cbars.render(layer, slot, self._assets.get(layer.redraw.font))
 
     def redraw_colorbar(self, layer_id: str) -> ColorbarLayer:
-        """Redraw colorbar ``layer_id`` for its grid slot's current normalisation and colormap.
+        """Redraw colorbar ``layer_id`` for its grid slot's current normalization and colormap.
 
         ``replace_grid`` does this automatically when it changes ``vmin``/``vmax`` or the
         LUT. Raises ``ColorbarRedrawError`` when the file holds no redraw data for the
@@ -445,7 +445,7 @@ class Scene:
 
     @property
     def stale_colorbars(self) -> tuple[str, ...]:
-        """Colorbars whose grid slot's normalisation or colormap changed after they were drawn.
+        """Colorbars whose grid slot's normalization or colormap changed after they were drawn.
 
         Their pixels no longer match the data; replace them (``replace_layer``) or hide
         them. Colorbars with redraw data are redrawn automatically; these are the rest.
@@ -455,7 +455,7 @@ class Scene:
     def replace_text(self, layer_id: str, value: str) -> TextSlot:
         """Render ``value`` into text slot ``layer_id`` with its embedded font; return the new slot.
 
-        The anchor, alignment, size, and colour stay as stored (``docs/format.md`` §10);
+        The anchor, alignment, size, and color stay as stored (``docs/format.md`` §10);
         only the text and its pixels (cropped, at a new ``left``/``top``) change. Raises
         ``TextFontError`` when the slot's font is missing or unusable (there is no
         fallback font), ``TypeError``/``ValueError`` for anything but one line of text.

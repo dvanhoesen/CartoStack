@@ -56,13 +56,13 @@ def filled(height: int, width: int, boxes: dict[tuple[int, int, int, int], Any])
     return out
 
 
-# --- Rasterisation against an independent brute-force rule ------------------------------
+# --- Rasterization against an independent brute-force rule ------------------------------
 
 
 def brute_counts(
     rings: list[np.ndarray], k: int, bounds: tuple[int, int, int, int], shape: tuple[int, int]
 ) -> np.ndarray:
-    """Even-odd test of every sample centre against every edge (docs/format.md §9)."""
+    """Even-odd test of every sample center against every edge (docs/format.md §9)."""
     c0, r0, c1, r1 = bounds
     h, w = shape
     ys = (np.arange(h * k) + 0.5)[:, None]
@@ -170,7 +170,7 @@ def test_translucent_bin_colour_composites_even_when_fully_covered() -> None:
     expect = Image.new("RGBA", (1, 1), RED)
     expect.alpha_composite(Image.new("RGBA", (1, 1), (0, 0, 255, 100)))
     assert tuple(out[0, 3]) == expect.getpixel((0, 0))
-    assert tuple(out[0, 5]) == (0, 0, 255, 100)  # over transparent: the colour itself
+    assert tuple(out[0, 5]) == (0, 0, 255, 100)  # over transparent: the color itself
 
 
 def test_draw_order_follows_bin_order_and_ties_keep_input_order() -> None:

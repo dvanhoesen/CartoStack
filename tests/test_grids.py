@@ -1,4 +1,4 @@
-"""Grid slots: Matplotlib's normalisation and colormap rules, index-map gathering, and Scene use."""
+"""Grid slots: Matplotlib's normalization and colormap rules, index-map gathering, and Scene use."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from cartostack import (
 )
 from cartostack import compositor as comp
 
-# Four colours, then under, over, bad.
+# Four colors, then under, over, bad.
 LUT = np.array(
     [[10, 0, 0, 255], [20, 0, 0, 255], [30, 0, 0, 255], [40, 0, 0, 255],
      [0, 0, 255, 255], [255, 0, 0, 255], [0, 0, 0, 0]],
@@ -46,7 +46,7 @@ def colors(s: GridSlot, values: Any) -> np.ndarray:
     return grids.cell_colors(s, values)
 
 
-# --- Values -> colours --------------------------------------------------------------------
+# --- Values -> colors --------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -57,7 +57,7 @@ def colors(s: GridSlot, values: Any) -> np.ndarray:
         (1.0, LUT[1]),
         (2.5, LUT[2]),
         (3.999, LUT[3]),
-        (4.0, LUT[3]),  # x == n_colors becomes the last colour
+        (4.0, LUT[3]),  # x == n_colors becomes the last color
         (4.0001, OVER),
         (-1e-6, UNDER),
         (np.inf, OVER),
@@ -83,7 +83,7 @@ def test_alpha_replaces_alpha_except_for_an_all_zero_bad_colour() -> None:
     assert (got[[0, 2, 3, 4, 5], 3] == 204).all()  # floor(0.8 * 255 + 0.5)
     np.testing.assert_array_equal(got[1], [0, 0, 0, 0])
     lut = LUT.copy()
-    lut[-1] = (128, 128, 128, 255)  # a visible bad colour takes the alpha
+    lut[-1] = (128, 128, 128, 255)  # a visible bad color takes the alpha
     got = colors(slot(alpha=0.7, lut=lut), values)
     np.testing.assert_array_equal(got[1], [128, 128, 128, 179])  # floor(178.5 + 0.5)
 
@@ -111,7 +111,7 @@ def test_value_dtype_float64() -> None:
     values = np.array([[1.0 - 1e-12, 1.0, 2.0], [3.0, 4.0, 5.0]])
     got = grids.lut_rows(slot(value_dtype="float64"), values)
     np.testing.assert_array_equal(got, [0, 1, 2, 3, 3, 5])
-    # In float32, 1 - 1e-12 rounds to 1.0 and lands in the second colour.
+    # In float32, 1 - 1e-12 rounds to 1.0 and lands in the second color.
     np.testing.assert_array_equal(grids.lut_rows(slot(), values)[:2], [1, 1])
 
 
@@ -157,7 +157,7 @@ def test_domain_edges_and_repeated_cells() -> None:
     assert not got[border].any()
     np.testing.assert_array_equal(got[1:4, 1:4], np.broadcast_to(LUT[0], (3, 3, 4)))
     np.testing.assert_array_equal(got[1:4, 4:7], np.broadcast_to(LUT[1], (3, 3, 4)))
-    np.testing.assert_array_equal(got[4:7, 1:4], np.zeros((3, 3, 4)))  # bad colour is transparent
+    np.testing.assert_array_equal(got[4:7, 1:4], np.zeros((3, 3, 4)))  # bad color is transparent
     np.testing.assert_array_equal(got[4:7, 4:7], np.broadcast_to(LUT[3], (3, 3, 4)))
 
 
@@ -264,7 +264,7 @@ def test_restyling_marks_colorbars_stale_until_replaced_or_removed() -> None:
     assert scene.stale_colorbars == ("cbar",)
     scene.replace_layer("cbar", gradient(1, 8, 4))
     assert scene.stale_colorbars == ()
-    lut = np.vstack([LUT[:4], LUT[:4], LUT[4:]])  # 8 colours now
+    lut = np.vstack([LUT[:4], LUT[:4], LUT[4:]])  # 8 colors now
     new = scene.replace_grid("t", values(), lut=lut)
     assert new.n_colors == 8
     assert scene.stale_colorbars == ("cbar",)

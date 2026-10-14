@@ -26,7 +26,7 @@ for variant 0); only the layer assignment is new:
   supersampling), ``above`` (everything else: borders, mask, cities, logo, title bar,
   legend, attribution), and the ``subtitle`` text slot; output 300 dpi with the tight
   crop resolved once.
-* Grid: ``below`` (zorder < 2), the ``temperature`` grid slot (500 × 500 cell centres,
+* Grid: ``below`` (zorder < 2), the ``temperature`` grid slot (500 × 500 cell centers,
   coolwarm, -10..35, alpha 0.8), ``above`` (counties, borders, cities, title, colorbar
   axes), and the ``subtitle`` text slot.
 
@@ -147,7 +147,7 @@ def author_grid(out: Path) -> dict:
     scene.save(path)
     ref = full_render(fig, bc.DPI, None)
     out = summary(scene, path, ref, t_build, caught)
-    # Colorbar redraw cost: replace values with and without a new normalisation.
+    # Colorbar redraw cost: replace values with and without a new normalization.
     import numpy as np
 
     times = {"same_norm": [], "new_norm": []}

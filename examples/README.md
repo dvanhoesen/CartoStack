@@ -6,7 +6,7 @@ then **update** it on every run using only NumPy and Pillow.
 | Script | Needs | Does |
 | --- | --- | --- |
 | [`author_grid.py`](author_grid.py) | `build` extra; Natural Earth shapefiles | Draws a temperature map of New York State and writes `grid.cstack` (5 layers: below, a `temperature` grid slot, above, a redrawable `colorbar`, a `subtitle` text slot), plus 4 sample inputs (`.npy`). |
-| [`update_grid.py`](update_grid.py) | runtime only | Writes one PNG per `.npy` input. Optional `--vmin`/`--vmax` change the colour range, and the colorbar is redrawn to match. |
+| [`update_grid.py`](update_grid.py) | runtime only | Writes one PNG per `.npy` input. Optional `--vmin`/`--vmax` change the color range, and the colorbar is redrawn to match. |
 | [`author_qpf.py`](author_qpf.py) | `build` extra + GeoPandas (PEP 723 header); QPF fixtures | Wraps the unchanged WPC QPF figure from `benchmarks/baseline_qpf.py` (a port of the production script) and writes `qpf.cstack` (below, a `qpf` polygon slot, above, a `subtitle` text slot). |
 | [`update_qpf.py`](update_qpf.py) | runtime only | Renders every WPC QPF product directory given, in one process. |
 | [`wpc_qpf.py`](wpc_qpf.py) | runtime only | A small reader for WPC's QPF shapefiles that uses only the standard library and NumPy (no GeoPandas). |

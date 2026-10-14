@@ -255,7 +255,7 @@ def test_matplotlib_from_the_verified_minimum_is_accepted(
     ],
 )
 def test_grid_slots_refuse_norms_they_cannot_reproduce(norm: Any) -> None:
-    """Only a linear range is stored, so other norms must fail rather than recolour."""
+    """Only a linear range is stored, so other norms must fail rather than recolor."""
     b = SceneBuilder.new(PROJ, EXTENT, width=200, height=150)
     lon, lat, _ = grid()
     with pytest.raises(BuildError, match="linear Normalize"):
