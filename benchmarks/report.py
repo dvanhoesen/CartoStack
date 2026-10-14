@@ -774,50 +774,81 @@ README_PARTS = (
 )
 
 
+README_RUNS = 10  # the README figure averages exactly this many fresh-process runs per side
+
+
+def mean_phases(rec) -> dict:
+    """Mean over runs of each phase; the phases of a run sum to its total, so these sum to the mean."""
+    return {ph: statistics.mean(r["phases_s"].get(ph, 0.0) + sum(p["phases_s"].get(ph, 0.0) for p in r["products"])
+                                for r in rec["runs"]) for ph in PHASES}
+
+
 def fig_readme_cold(records, out: Path) -> None:
-    """README figure: the grid map's cold product, split into broad parts, with no footer."""
+    """README figures (linear and log axis): the grid map's cold product, mean of 10 runs, no footer."""
     base = pick(records, "cartopy-baseline", "grid", "cold-process")
     pkg = pick(records, "package", "grid", "cold-process")
     if base is None or pkg is None:
         SKIPPED.append("readme_cold_start.png: needs the grid baseline and package cold runs")
         return
-    fig, ax = plt.subplots(figsize=(10, 3.4))
-    ax.set_axisbelow(True)
-    rows = [("Matplotlib/Cartopy", base), ("CartoStack", pkg)]
-    base_total = run_totals(base)["median"]
-    for y, (label, rec) in zip((1, 0), rows, strict=True):
-        phases = median_phases(rec)
-        scale = run_totals(rec)["median"] / sum(phases.values())  # parts sum to the median total
-        left = 0.0
-        for color, (_, keys) in zip(SLOTS, README_PARTS, strict=False):
-            width = sum(phases[k] for k in keys) * scale
-            if width > 0:
-                ax.barh(y, width, left=left, height=0.56, color=color, edgecolor=SURFACE, linewidth=2)
-            if keys == ("static",) and width > base_total * 0.3:
-                ax.text(left + width / 2, y, f"Draw the static map: {width:.1f} s", ha="center",
-                        va="center", fontsize=10, color=INK, fontweight="bold")
-            left += width
-        total = run_totals(rec)["median"]
-        text = f"{total:.1f} s" if rec is base else f"{total:.2f} s  ·  {base_total / total:.0f}× faster  ·  no static map to draw"
-        ax.text(left + base_total * 0.012, y, text, va="center", fontsize=11, color=INK, fontweight="bold")
-    ax.set_yticks([1, 0], [r[0] for r in rows], fontsize=11, color=INK)
-    ax.tick_params(axis="y", length=0)
-    ax.set_xlim(0, base_total * 1.12)
-    ax.set_xticks(np.arange(0, base_total * 1.12, 4))
-    ax.set_ylim(-0.55, 1.55)
-    ax.set_xlabel("Seconds to make one map in a fresh Python process (median)", fontsize=9.5)
-    ax.grid(axis="y", visible=False)
-    ax.spines["left"].set_visible(False)
-    handles = [Patch(color=c, label=name) for c, (name, _) in zip(SLOTS, README_PARTS, strict=False)]
-    fig.legend(handles=handles, loc="upper left", ncol=4, bbox_to_anchor=(0.012, 0.83), fontsize=8.5,
-               handlelength=1.2, columnspacing=1.4)
-    fig.suptitle("Cold start: Matplotlib/Cartopy versus CartoStack, one product per process",
-                 x=0.012, y=0.97, ha="left", fontsize=13, fontweight="bold")
-    fig.text(0.012, 0.865, "A 1200 × 800 px temperature map, starting from data on disk", ha="left",
-             va="center", fontsize=9.5, color=INK_2)
-    fig.tight_layout(rect=(0, 0, 1, 0.76))
-    fig.savefig(out / "readme_cold_start.png", dpi=200)
-    plt.close(fig)
+    if {len(base["runs"]), len(pkg["runs"])} != {README_RUNS}:
+        SKIPPED.append(f"readme_cold_start.png: needs {README_RUNS} cold runs per side, got "
+                       f"{len(base['runs'])} (Cartopy) and {len(pkg['runs'])} (CartoStack)")
+        return
+    rows = [("Matplotlib/Cartopy", mean_phases(base)), ("CartoStack", mean_phases(pkg))]
+    for log in (False, True):
+        fig, ax = plt.subplots(figsize=(10, 3.4 if not log else 3.0))
+        ax.set_axisbelow(True)
+        base_total = sum(rows[0][1].values())
+        for y, (_, phases) in zip((1, 0), rows, strict=True):
+            total = sum(phases.values())
+            if log:
+                # Stacked parts would be distorted on a log axis, so it shows totals as dots.
+                ax.scatter([total], [y], s=110, color=SLOTS[0], edgecolor=SURFACE, linewidth=2, zorder=3)
+                ax.text(total * 1.25, y, fmt_time(total), va="center", fontsize=11, color=INK, fontweight="bold")
+                continue
+            left = 0.0
+            for color, (_, keys) in zip(SLOTS, README_PARTS, strict=False):
+                width = sum(phases[k] for k in keys)
+                if width > 0:
+                    ax.barh(y, width, left=left, height=0.56, color=color, edgecolor=SURFACE, linewidth=2)
+                if keys == ("static",) and width > base_total * 0.3:
+                    ax.text(left + width / 2, y, f"Draw the static map: {width:.1f} s", ha="center",
+                            va="center", fontsize=10, color=INK, fontweight="bold")
+                left += width
+            ax.text(left + base_total * 0.012, y, fmt_time(total), va="center", fontsize=11, color=INK,
+                    fontweight="bold")
+        ax.set_yticks([1, 0], [r[0] for r in rows], fontsize=11, color=INK)
+        ax.tick_params(axis="y", length=0)
+        if log:
+            ax.set_xscale("log")
+            ax.set_xlim(0.05, 50)
+            ticks = [0.1, 1, 10]
+            ax.set_xticks(ticks, [f"{t:g} s" for t in ticks])
+            ax.xaxis.set_minor_formatter(plt.NullFormatter())
+        else:
+            ax.set_xlim(0, base_total * 1.12)
+            ticks = np.arange(0, base_total * 1.12, 4)
+            ax.set_xticks(ticks, [f"{t:g} s" for t in ticks])
+        ax.set_ylim(-0.55, 1.55)
+        ax.set_xlabel("Time to make one map (average)", fontsize=9.5)
+        ax.grid(axis="y", visible=False)
+        ax.spines["left"].set_visible(False)
+        top = 0.76 if not log else 0.8
+        if not log:
+            handles = [Patch(color=c, label=name) for c, (name, _) in zip(SLOTS, README_PARTS, strict=False)]
+            fig.legend(handles=handles, loc="upper center", ncol=4, bbox_to_anchor=(0.5, 0.83), fontsize=8.5,
+                       handlelength=1.2, columnspacing=1.4)
+        fig.suptitle("Cold start: Matplotlib/Cartopy versus CartoStack", x=0.5, y=0.97, ha="center",
+                     fontsize=13, fontweight="bold")
+        fig.text(0.5, 0.865 if not log else 0.85, "1200 x 800 temperature map from data stored locally",
+                 ha="center", va="center", fontsize=9.5, color=INK_2)
+        fig.tight_layout(rect=(0, 0, 1, top))
+        fig.savefig(out / ("readme_cold_start_log.png" if log else "readme_cold_start.png"), dpi=200)
+        plt.close(fig)
+
+
+def fmt_time(seconds: float) -> str:
+    return f"{seconds:.1f} s" if seconds >= 1 else f"{seconds:.2f} s"
 
 
 def fig_speedups(rows, out: Path, stamp: str, sources: list[str]) -> None:
@@ -898,7 +929,8 @@ def write_index(out: Path, stamp: str, inputs: dict, records, rows, checks) -> N
              "(extra PNG encodes, output hashing) and process exit, for every series alike.", "",
              "## Figures", "",
              "- `speedup_summary.png`: speed-up by workload and mode (cold, loop, warm kept separate).",
-             "- `readme_cold_start.png`: the README figure (grid map, one product per fresh process; no footer).",
+             "- `readme_cold_start.png`, `readme_cold_start_log.png`: the README figure (grid map, one product "
+             "per fresh process, mean of 10 runs; no footer), with a linear and a log time axis.",
              "- `cold_phases.png`: one product per fresh process; total time and where it goes.",
              "- `qpf_loop_cumulative.png`: 18 QPF products in one process, cumulative time.",
              "- `qpf_time_vs_polygons.png`: per-product cost against polygon count.",
